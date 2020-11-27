@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="0x01 准备工作 ubuntu.    [ 或者其他系统，需要换源 ] gdb.          [ 插件可选: gef &#x2F; peda &#x2F; pwngdb ] python     [ 安装 pwntools ] shellcode [ https:&#x2F;&#x2F;www.exploit-db.com&#x2F;shellcodes 或者 github 上找 ] IDA            [ py 得到 ]  0">
+<meta name="keywords" content="learn">
+<meta property="og:type" content="article">
+<meta property="og:title" content="pwn 入门">
+<meta property="og:url" content="http:&#x2F;&#x2F;yoursite.com&#x2F;2019&#x2F;12&#x2F;09&#x2F;pwn-%E5%85%A5%E9%97%A8&#x2F;index.html">
+<meta property="og:site_name" content="zndetcl blog">
+<meta property="og:description" content="0x01 准备工作 ubuntu.    [ 或者其他系统，需要换源 ] gdb.          [ 插件可选: gef &#x2F; peda &#x2F; pwngdb ] python     [ 安装 pwntools ] shellcode [ https:&#x2F;&#x2F;www.exploit-db.com&#x2F;shellcodes 或者 github 上找 ] IDA            [ py 得到 ]  0">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191216173654157.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191209210624834.png">
+<meta property="og:updated_time" content="2019-12-16T12:32:04.742Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191216173654157.png">
+    
+    
+        
+          
+              <link rel="shortcut icon" href="/images/favicon.ico">
+          
+        
+        
+          
+            <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+          
+        
+        
+          
+            <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+          
+        
+    
+    <!-- title -->
+    <title>pwn 入门</title>
+    <!-- styles -->
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- persian styles -->
+    
+      <link rel="stylesheet" href="/css/rtl.css">
+    
+    <!-- rss -->
+    
+    
+</head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" href="/2019/12/14/format-string-vuln/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/" target="_blank" rel="noopener"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&text=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&is_video=false&description=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=pwn 入门&body=Check out this article: http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&name=pwn 入门&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&t=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-准备工作"><span class="toc-number">1.</span> <span class="toc-text">0x01 准备工作</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-入门技能"><span class="toc-number">2.</span> <span class="toc-text">0x02 入门技能</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-尝试栈溢出"><span class="toc-number">3.</span> <span class="toc-text">0x03 尝试栈溢出</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#a-FORTIFY"><span class="toc-number">3.1.</span> <span class="toc-text">a. FORTIFY</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#b-RELRO"><span class="toc-number">3.2.</span> <span class="toc-text">b. RELRO</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-shellcode"><span class="toc-number">4.</span> <span class="toc-text">0x04  shellcode</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-总结"><span class="toc-number">5.</span> <span class="toc-text">0x05 总结</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        pwn 入门
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">zndetcl blog</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2019-12-09T12:15:49.000Z" itemprop="datePublished">2019-12-09</time>
+        
+      
+    </div>
+
+
+      
+    <div class="article-category">
+        <i class="fas fa-archive"></i>
+        <a class="category-link" href="/categories/binary/">binary</a>
+    </div>
+
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h2 id="0x01-准备工作"><a href="#0x01-准备工作" class="headerlink" title="0x01 准备工作"></a>0x01 准备工作</h2><ol>
+<li>ubuntu.    [ 或者其他系统，需要换源 ]</li>
+<li>gdb.          [ 插件可选: gef / peda / pwngdb ]</li>
+<li>python     [ 安装 pwntools ]</li>
+<li>shellcode [ <a href="https://www.exploit-db.com/shellcodes" target="_blank" rel="noopener">https://www.exploit-db.com/shellcodes</a> 或者 github 上找 ]</li>
+<li>IDA            [ py 得到 ]</li>
+</ol>
+<h2 id="0x02-入门技能"><a href="#0x02-入门技能" class="headerlink" title="0x02 入门技能"></a>0x02 入门技能</h2><ol>
+<li>汇编                [ <a href="https://blog.csdn.net/kennyrose/article/details/7575952" target="_blank" rel="noopener">intel汇编 和 AT&amp;T汇编的区别</a> ]</li>
+<li>c &amp;&amp; python  [ <a href="http://www.91ri.org/14382.html" target="_blank" rel="noopener">pwntools 的常见用法</a> ]</li>
+<li>函数调用约定 [ 程序员的自我修养 / 深入理解计算机原理 ] [ <a href="https://www.cnblogs.com/clover-toeic/p/3755401.html" target="_blank" rel="noopener">C调用栈1</a>/<a href="https://www.cnblogs.com/clover-toeic/p/3756668.html" target="_blank" rel="noopener">C调用栈2</a>/<a href="http://www.freebuf.com/articles/system/135685.html" target="_blank" rel="noopener">linux中的GOT &amp; PLT</a>/<a href="https://blog.betamao.me/2017/09/06/%E7%B3%BB%E7%BB%9F%E4%BF%9D%E6%8A%A4/" target="_blank" rel="noopener">系统防护机制</a> ]</li>
+<li>IDA &amp;&amp; gdb   [ <a href="https://www.cnblogs.com/xuan52rock/p/11005976.html" target="_blank" rel="noopener">IDA Pro7.0 使用技巧 </a>]</li>
+<li>linux 相关</li>
+</ol>
+<p><em>摘抄自</em> <a href="https://www.jianshu.com/p/7133863623e6" target="_blank" rel="noopener">pwn入门的一些学习资料 </a></p>
+<h2 id="0x03-尝试栈溢出"><a href="#0x03-尝试栈溢出" class="headerlink" title="0x03 尝试栈溢出"></a>0x03 尝试栈溢出</h2><p><a href="https://www.jianshu.com/p/47d484b9227e" target="_blank" rel="noopener">栈溢出攻击及防护方法简介</a></p>
+<p>文章非常详细，文风很好，栈结构清晰（不知道咋画的，之后可以搞看看）</p>
+<p>首先学习下常用保护机制 [ <a href="https://www.cnblogs.com/Spider-spiders/p/8798628.html" target="_blank" rel="noopener">linux程序的常用保护机制</a>/<a href="https://blog.betamao.me/2017/09/06/系统保护/" target="_blank" rel="noopener">系统防护机制 </a>]</p>
+<p>linux 中，使用 checksec 检查可执行文件属性：</p>
+<ol>
+<li>CANNARY 栈保护</li>
+<li>FORTIFY (见下文)</li>
+<li>NX      栈不可执行</li>
+<li>PIE      ASLR 随机地址</li>
+<li>RELRO  (见下文)</li>
+</ol>
+<p>高版本 gcc 中，默认全部开启，如需关闭则添加如下编译参数</p>
+<ul>
+<li>NX：<code>-z execstack</code> / <code>-z noexecstack</code> (关闭 / 开启)</li>
+<li>Canary：<code>-fno-stack-protector</code> /<code>-fstack-protector</code> / <code>-fstack-protector-all</code> (关闭 / 开启 / 全开启)</li>
+<li>PIE：<code>-no-pie</code> / <code>-pie</code> (关闭 / 开启)</li>
+<li>RELRO：<code>-z norelro</code> / <code>-z lazy</code> / <code>-z now</code> (关闭 / 部分开启 / 完全开启)</li>
+</ul>
+<p>（gcc -g 参数：打印调试信息）</p>
+<p>简单点：</p>
+<p><code>-z execstack -fno-stack-protector -no-pie -g</code></p>
+<p><em>以下内容来自 <a href="https://www.cnblogs.com/ichunqiu/p/11274930.html" target="_blank" rel="noopener">https://www.cnblogs.com/ichunqiu/p/11274930.html</a></em></p>
+<h3 id="a-FORTIFY"><a href="#a-FORTIFY" class="headerlink" title="a. FORTIFY"></a>a. FORTIFY</h3><p>这是一个由GCC实现的源码级别的保护机制，其功能是在编译的时候检查源码以避免潜在的缓冲区溢出等错误。简单地说，加了这个保护之后（编译时加上参数 <code>-D_FORTIFY_SOURCE=2</code>）一些敏感函数如read, fgets, memcpy, printf等等可能导致漏洞出现的函数都会被替换成 <code>__read_chk</code> ,<code>__fgets_chk</code> , <code>__memcpy_chk</code> , <code>__printf_chk</code>等。</p>
+<p>这些带了chk的函数会检查读取/复制的字节长度是否超过缓冲区长度，通过检查·诸如%n之类的字符串位置是否位于可能被用户修改的可写地址，避免了格式化字符串跳过某些参数（如直接%7$x）等方式来避免漏洞出现。开启了FORTIFY保护的程序会被checksec检出，此外，在反汇编时直接查看got表也会发现chk函数的存在。</p>
+<p><img src="/.com//image-20191216173654157.png" alt="image-20191216173654157"></p>
+<h3 id="b-RELRO"><a href="#b-RELRO" class="headerlink" title="b. RELRO"></a>b. RELRO</h3><p>RELRO是重定位表只读（Relocation Read Only）的缩写，重定位表即我们经常提到的ELF文件中的got表和plt表</p>
+<p><a href="http://www.freebuf.com/articles/system/135685.html" target="_blank" rel="noopener">linux中的GOT &amp; PLT</a></p>
+<p>这两个表，正如其名，是为程序外部的函数和变量（不在程序里定义和实现的函数和变量，比如read。显然你在自己的代码里调用read函数的时候不用自己写一个read函数的实现）的重定位做准备的。由于重定位需要额外的性能开销，出于优化考虑，一般来说程序会使用延迟加载，即外部函数的内存地址是在第一次被调用时（例如read函数，第一次调用即为程序第一次执行call read）被找到并且填进got表里面的。</p>
+<p>因此，<strong>got表必须是可写的</strong>。但是 got 表可写也给格式化字符串漏洞带来了一个非常方便的利用方式，即修改got表。我们可以<strong>通过漏洞修改某个函数的 got 表项（比如puts）为 system 函数的地址</strong>，这样一来，我们执行 call  puts 实际上调用的却是 system，相应的，传入的参数也给了 system，从而可以执行 system(“/bin/sh”)</p>
+<p>能够这样利用的情况是: RELRO -&gt; Partail RELRO (使用 checksec 查看)，这表示 got 表可写</p>
+<p>当完全开启 RELRO 时:  RELRO -&gt; Full RELRO ，这表示无论 .got 还是 .got.plt 都无法修改</p>
+<p>我们可以尝试修改 got 表，程序不会报错，但是地址对应数据未被修改</p>
+<p>显然，当程序开启了 Full RELRO 保护之后，包括格式化字符串漏洞在内，试图<strong>通过漏洞劫持 got 表的行为都将会被阻止</strong>。</p>
+<p>好，我们继续</p>
+<p>编写存在栈溢出的程序</p>
+<pre><code class="c">// hello.c  // for test
+#include &lt;stdio.h&gt;
+
+int main() {
+    char name[64];
+    printf(&quot;What&#39;s your name?&quot;);
+    scanf(&quot;%s&quot;, name);
+    printf(&quot;Hello, %s!\n&quot;, name);
+    return 0;
+}</code></pre>
+<p>然后 </p>
+<p><code>$ gcc -z execstack -fno-stack-protector -no-pie -g -o hello hello.c</code></p>
+<p>使用 gdb ，调试 hello</p>
+<p> <code>$ gdb -q hello</code> </p>
+<p>断点 main 函数</p>
+<p> <code>$ b *main</code> </p>
+<p>执行 hello</p>
+<p> <code>$ r (回车)</code> </p>
+<p>查看 rsp</p>
+<p> <code>$ x/10x $rsp</code> (10 的大小视输出结果情况而定)</p>
+<p>得到在 main 函数 ret 时弹出的 rip 值，开始计算溢出大小 ( push rbp 之前，rsp-&gt;rip(old) )</p>
+<p>我们需要覆盖重写 rip(old) ，这样就能控制 ret 后的执行流程</p>
+<p>rbp + 64 = 72 (0x48)</p>
+<p>从 73 位开始，就是存储 rip(old) 的地方</p>
+<p>我们需要填充 72 位，然后填入想要跳转的地址 addr</p>
+<p>如果 NX 保护关闭，那么我们可以就近取材，直接把 shellcode 塞入栈中</p>
+<pre><code class="text">（从上往下，地址增大）
+rsp                  -&gt; 72 位填充
+[...]
+rip(old)         -&gt; &amp;name + 72 + 8
+&amp;name[80]   -&gt; shellcode 开始</code></pre>
+<p><strong>注意，在写入地址时，因为 name 数组在栈中是由小地址增高到大地址（小端序），而一般一处地址的表示方式是大端序，所以需要将地址转换为小端序，恰好在执行指令时，也是从低地址到高地址这样的顺序执行的</strong></p>
+<p><strong>如: 0x00007fffffffe088 -&gt; \x88\xe0\xff\xff\xff\x7f\x00\x00</strong></p>
+<p>如果 NX 保护开启，在该程序中，可以在 main 函数 ret 后利用 rop 的思路</p>
+<pre><code class="text">（从上往下，地址增大）
+rsp                  -&gt; 72 位填充
+[...]
+rip(old)         -&gt; rop 开始
+[...]</code></pre>
+<p>可以使用 <a href="https://github.com/JonathanSalwan/ROPgadget" target="_blank" rel="noopener">ROPgadgets</a> || <a href="https://github.com/0vercl0k/rp" target="_blank" rel="noopener">rp++</a> || <a href="https://github.com/sashs/Ropper" target="_blank" rel="noopener">ropper</a> 寻找 rop 相关利用指令地址</p>
+<p>ROP 总体思路就是，利用 rip 的指向，不停的控制执行流程，只要存在 jmp、pop rip 的调用链即可利用</p>
+<p>如：</p>
+<pre><code class="text">[...]
+addr0         jmp addr1
+[...]
+addr1            pop rax
+addr1+8        ret
+[...]
+addr2            pop rsi
+addr2+8        ret
+[...]
+addr3            pop rdi
+addr3+8        ret
+[...]
+addr4            pop rdx
+addr4+8        ret</code></pre>
+<p>假设存在如上展示的地址(只要该地址存在正常的指令码即可利用)，那么可以构造栈如下</p>
+<pre><code class="text">（从上往下，地址增大）
+rsp                  -&gt; 72 位填充
+[...]
+rip(old)         -&gt; addr1
+rip(old)+8    -&gt; 0x3b
+rip(old)+16    -&gt; addr2
+rip(old)+24    -&gt; 0x0
+rip(old)+32    -&gt; addr3
+rip(old)+40 -&gt; &quot;/bin/sh\x00&quot;
+rip(old)+48 -&gt; addr4
+rip(old)+56 -&gt; 0x0</code></pre>
+<p>当 main 函数 ret 时，清理栈，pop rip 将 addr1 赋值给 rip，于是跳转到 addr1 执行指令 pop eax，将栈中的 0x3b 赋值给 rax 寄存器……如此往复，</p>
+<pre><code class="text">rax-&gt;0x3b
+rsi-&gt;0x0
+rdi-&gt;&quot;/bin/sh\x00&quot;
+rdx-&gt;0x0</code></pre>
+<p>再在后续跳转到 syscall 指令，就可以弹出一个 shell 了</p>
+<p><strong>注意，字符串最好在高地址填入多个 \x00 ，也不知道为啥，在 /bin/sh 后加上一个 \x00 没啥作用</strong></p>
+<pre><code class="text">                     Stack
+      low_addr  +-------------+
+                |     ...     |
+                +-------------+
+                |  /bin//sh   |
+                  +-------------+
+                |0x00000000000| // 多来几个\x00
+                +-------------+
+                |     ...     |
+                +-------------+
+                |     ...     |
+     high_addr  +-------------+
+</code></pre>
+<p>最后，在 ubuntu18.04 虚拟机里面测试时，无奈 syscall 只有一处，且…..</p>
+<p><img src="/.com//image-20191209210624834.png" alt="image-20191209210624834"></p>
+<p>如上图，最后一处 ret 跳转到 0x40122c ，然后确实能够执行 shellcode ，寄存器值都处理好了，但是注意途中 syscall 过后会有一个 jmp 0x40122e ，这里就搞成了无限循环233333，导致 shell 没法拿到，换了个删除文件的 shellcode 都必须调试时单步过 syscall 指令才会生效，对新人太不友好了</p>
+<h2 id="0x04-shellcode"><a href="#0x04-shellcode" class="headerlink" title="0x04  shellcode"></a>0x04  shellcode</h2><p>shellcode 是一段用于利用软件漏洞而执行的代码，shellcode 为16进制的机器码</p>
+<p>linux 系统特有的系统调用方式，linux 提供了许多很方便的系统调用（如 write, read, open, fork, exec 等），通过 <code>syscall</code> 指令调用，由 rax 指定需要调用的系统调用编号，由 rdi,rsi,rdx,r10,r9 和 r8 寄存器传递系统调用需要的参数。Linux(x64)系统调用表详见 <a href="https://link.jianshu.com?t=http://blog.rchapman.org/post/36801038863/linux-system-call-table-for-x86-64" target="_blank" rel="noopener">linux system call table for x86-64</a></p>
+<p>随便在  <a href="https://www.exploit-db.com/shellcodes" target="_blank" rel="noopener">https://www.exploit-db.com/shellcodes</a> || <a href="http://shell-strm.org/shellcode" target="_blank" rel="noopener">http://shell-strm.org/shellcode</a> 找一个 shellcode (需要目标机器的指令集信息 <code>unman -a</code>)</p>
+<pre><code class="asm">;shellcode.asm
+        section .text
+            global _start
+
+    _start:
+            xor     rdx, rdx
+            mov     qword rbx, &#39;//bin/sh&#39;
+            shr     rbx, 0x8
+            push    rbx
+            mov     rdi, rsp
+            push    rax
+            push    rdi
+            mov     rsi, rsp
+            mov     al, 0x3b
+            syscall</code></pre>
+<p>使用 nasm 编译</p>
+<p><code>$ nasm -f elf64 shellcode.asm</code></p>
+<p>将会生成 shellcode.o 文件，然后使用 ld 命令将其链接为可执行文件</p>
+<p><code>$ ld -s -o shellcode shellcode.o</code></p>
+<p>可以尝试执行一下 shellcode ，会得到一个 shell</p>
+<p>如果 NX 、 CANNARY、 PIE 都关闭了都情况下，就可以直接将 shellcode 塞进栈里</p>
+<p>使用 objdump 出 shellcode 的指令码</p>
+<p><code>$ objdump -d -M intel shellcode</code></p>
+<p>因为指令是从低地址到高地址执行的（栈溢出也是由低到高填充），所以只需要将指令码挨个抄下来即可</p>
+<p>如果 NX、CANNARY 开启（ CANNARY 开启不能利用漏洞函数中的 ret ，需要其他方式），就可以使用 rop 的思路，这个时候我们需要了解 syscall 调用的时候各个寄存器的值，然后使用 rop 去模拟达到和 shellcode 中进行 syscall 调用之前的状态</p>
+<ol>
+<li><p>使用 gdb 调试 shellcode ，断点在 syscall 的地址(可以 objdump 拿到)，查看各个关键寄存器的值</p>
+</li>
+<li><p>利用 rop ，在 syscall 调用前将漏洞程序中的各个寄存器的值模拟成 shellcode 中 syscall 调用时的样子</p>
+</li>
+</ol>
+<blockquote>
+<p>用exec系统调用打开一个shell终端需要的参数和指令如下：</p>
+</blockquote>
+<pre><code class="csharp">        mov rax, 0x3b   ; system call number, 0x3b for sys_exec
+        mov rdi, PROG   ; char *prog (program path)
+        mov rsi, 0      ; char **agcv
+        mov rdx, 0      ; char **env
+        syscall
+PROG:   DB &quot;/bin/sh&quot;, 0</code></pre>
+<blockquote>
+<p>其中rax为系统调用编号，rdi为字符串指针、指向可执行程序的完整路径，rsi和rdx都是字符串指针数组，保存了参数列表和环境变量，在此处可以直接至为0</p>
+</blockquote>
+<p>如上，最重要的几个寄存器就是 rax, rdi, rsi, rdx 了</p>
+<h2 id="0x05-总结"><a href="#0x05-总结" class="headerlink" title="0x05 总结"></a>0x05 总结</h2><p>学习了下简单情况下（所有保护机制关闭）的栈溢出，以及浅尝 ROP 的攻击方式&amp;思路</p>
+<p>无奈 syscall 后有 jmp，没能弹 shell</p>
+<p>其实是一个比较简单的东西，搞了2天，现在看来还是花点时间弄一些基础，如汇编之类的比较好</p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-准备工作"><span class="toc-number">1.</span> <span class="toc-text">0x01 准备工作</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-入门技能"><span class="toc-number">2.</span> <span class="toc-text">0x02 入门技能</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-尝试栈溢出"><span class="toc-number">3.</span> <span class="toc-text">0x03 尝试栈溢出</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#a-FORTIFY"><span class="toc-number">3.1.</span> <span class="toc-text">a. FORTIFY</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#b-RELRO"><span class="toc-number">3.2.</span> <span class="toc-text">b. RELRO</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-shellcode"><span class="toc-number">4.</span> <span class="toc-text">0x04  shellcode</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-总结"><span class="toc-number">5.</span> <span class="toc-text">0x05 总结</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&text=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&is_video=false&description=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=pwn 入门&body=Check out this article: http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&title=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&name=pwn 入门&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/09/pwn-%E5%85%A5%E9%97%A8/&t=pwn 入门" target="_blank" rel="noopener"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy; 2020 zndetcl
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+<link rel="stylesheet" href="/lib/justified-gallery/css/justifiedGallery.min.css">
+
+    <!-- jquery -->
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/lib/justified-gallery/js/jquery.justifiedGallery.min.js"></script>
+<!-- clipboard -->
+
+  <script src="/lib/clipboard/clipboard.min.js"></script>
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight .code pre").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      target: function(trigger) {
+        return trigger.nextElementSibling;
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+<script src="/js/main.js"></script>
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>

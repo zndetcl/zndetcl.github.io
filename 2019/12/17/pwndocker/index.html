@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="0x01 前言mac 下 gdb 各种问题，无奈选择 pwndocker，但是 skysider&#x2F;pwndocker 似乎还是有各种问题，只能自己动手了 0x02 准备镜像在官方镜像库中拉取心怡的 ubuntu 版本  ubuntu docker 如下  我这里选择的是 18.04 的 0x03 制作容器因为需要支持 gdb 调试、目录共享等条件，所以 docker run 具体命令如下 $ do">
+<meta name="keywords" content="learn">
+<meta property="og:type" content="article">
+<meta property="og:title" content="pwndocker">
+<meta property="og:url" content="http:&#x2F;&#x2F;yoursite.com&#x2F;2019&#x2F;12&#x2F;17&#x2F;pwndocker&#x2F;index.html">
+<meta property="og:site_name" content="zndetcl blog">
+<meta property="og:description" content="0x01 前言mac 下 gdb 各种问题，无奈选择 pwndocker，但是 skysider&#x2F;pwndocker 似乎还是有各种问题，只能自己动手了 0x02 准备镜像在官方镜像库中拉取心怡的 ubuntu 版本  ubuntu docker 如下  我这里选择的是 18.04 的 0x03 制作容器因为需要支持 gdb 调试、目录共享等条件，所以 docker run 具体命令如下 $ do">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191217120212940.png">
+<meta property="og:updated_time" content="2019-12-18T02:59:35.781Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191217120212940.png">
+    
+    
+        
+          
+              <link rel="shortcut icon" href="/images/favicon.ico">
+          
+        
+        
+          
+            <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+          
+        
+        
+          
+            <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+          
+        
+    
+    <!-- title -->
+    <title>pwndocker</title>
+    <!-- styles -->
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- persian styles -->
+    
+      <link rel="stylesheet" href="/css/rtl.css">
+    
+    <!-- rss -->
+    
+    
+</head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" href="/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" href="/2019/12/14/format-string-vuln/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/17/pwndocker/" target="_blank" rel="noopener"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/17/pwndocker/&text=pwndocker" target="_blank" rel="noopener"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/17/pwndocker/&is_video=false&description=pwndocker" target="_blank" rel="noopener"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=pwndocker&body=Check out this article: http://yoursite.com/2019/12/17/pwndocker/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/17/pwndocker/&name=pwndocker&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/17/pwndocker/&t=pwndocker" target="_blank" rel="noopener"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-前言"><span class="toc-number">1.</span> <span class="toc-text">0x01 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-准备镜像"><span class="toc-number">2.</span> <span class="toc-text">0x02 准备镜像</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-制作容器"><span class="toc-number">3.</span> <span class="toc-text">0x03 制作容器</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-换源"><span class="toc-number">4.</span> <span class="toc-text">0x04 换源</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-各种工具"><span class="toc-number">5.</span> <span class="toc-text">0x05 各种工具</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        pwndocker
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">zndetcl blog</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2019-12-17T03:56:42.000Z" itemprop="datePublished">2019-12-17</time>
+        
+      
+    </div>
+
+
+      
+    <div class="article-category">
+        <i class="fas fa-archive"></i>
+        <a class="category-link" href="/categories/env/">env</a>
+    </div>
+
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h2 id="0x01-前言"><a href="#0x01-前言" class="headerlink" title="0x01 前言"></a>0x01 前言</h2><p>mac 下 gdb 各种问题，无奈选择 pwndocker，但是 <a href="https://hub.docker.com/r/skysider/pwndocker" target="_blank" rel="noopener">skysider/pwndocker</a> 似乎还是有各种问题，只能自己动手了</p>
+<h2 id="0x02-准备镜像"><a href="#0x02-准备镜像" class="headerlink" title="0x02 准备镜像"></a>0x02 准备镜像</h2><p>在官方镜像库中拉取心怡的 ubuntu 版本  <a href="https://hub.docker.com/_/ubuntu" target="_blank" rel="noopener">ubuntu docker</a></p>
+<p>如下</p>
+<p><img src="/.com//image-20191217120212940.png" alt="image-20191217120212940"></p>
+<p>我这里选择的是 18.04 的</p>
+<h2 id="0x03-制作容器"><a href="#0x03-制作容器" class="headerlink" title="0x03 制作容器"></a>0x03 制作容器</h2><p>因为需要支持 gdb 调试、目录共享等条件，所以 <code>docker run</code> 具体命令如下</p>
+<pre><code class="bash">$ docker run -it -h zndetcl --cap-add=SYS_PTRACE --privileged --name pwndocker -v /Users/pwn:/pwn ubuntu</code></pre>
+<p>稍微解释一下上述命令</p>
+<p><code>-v /Users/pwn:/pwn</code> : 在容器中设置了一个挂载点，将宿主机上的 <code>/Users/pwn</code> 目录中的内容关联到容器中的 <code>/pwn</code> 目录下，这样无论是在容器中对 <code>/pwn</code> 的操作，还是在宿主机中对 <code>/Users/pwn</code> 的操作，二者都是完全实时同步，实现了一个目录共享的需求</p>
+<p><code>--cap-add=SYS_PTRACE</code> : 因为容器中需要使用到 gdb 进行动态调试，而 gdb 需要  <code>ptrace</code> 的支持</p>
+<p><code>--privileged</code> : 消除一些可能由权限引起的报错，例如 gdb 调试时，无法下断等 （ <code>warning: Error disabling address space randomization: Operation not permitted</code> 是因为 linux 内核为了安全起见，采用了Seccomp(secure computing)的沙箱机制来保证系统不被破坏。它能使一个进程进入到一种“安全”运行模式，该模式下的进程只能调用4种系统调用（system calls），即read(), write(), exit()和sigreturn()，否则进程便会被终止。<strong>这种情况也可以使用 <code>--security-opt seccomp=unconfined</code> 让 gdb 顺畅调试</strong>）</p>
+<h2 id="0x04-换源"><a href="#0x04-换源" class="headerlink" title="0x04 换源"></a>0x04 换源</h2><p>在容器制作好了之后，使用如下命令进入容器</p>
+<p><code>docker exec -it container_id /bin/bash</code> </p>
+<p>第一步先换源，不知道为啥，docker 里的 <code>ubuntu18.04</code> 国内源只有 阿里云 源最稳，其他 ubuntu 版本未测试</p>
+<pre><code class="text">deb http://mirrors.aliyun.com/ubuntu/ bionic main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ bionic-security main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ bionic-updates main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ bionic-proposed main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ bionic-backports main restricted universe multiverse
+#deb-src http://mirrors.aliyun.com/ubuntu/ bionic main restricted universe multiverse
+#deb-src http://mirrors.aliyun.com/ubuntu/ bionic-security main restricted universe multiverse
+#deb-src http://mirrors.aliyun.com/ubuntu/ bionic-updates main restricted universe multiverse
+#deb-src http://mirrors.aliyun.com/ubuntu/ bionic-proposed main restricted universe multiverse
+#deb-src http://mirrors.aliyun.com/ubuntu/ bionic-backports main restricted universe multiverse</code></pre>
+<p>如上内容替换掉 <code>/etc/apt/source.list</code> 中的 ubuntu 官方源，注意这里为了追求效率注释了 src 源码，如有需要去掉注释即可</p>
+<p><code>apt-get update</code> 更新源</p>
+<h2 id="0x05-各种工具"><a href="#0x05-各种工具" class="headerlink" title="0x05 各种工具"></a>0x05 各种工具</h2><p><code>vim</code></p>
+<p><code>gcc</code></p>
+<p><code>gdb</code> &amp; <code>gef</code> | <code>pwngdb</code> | <code>peda</code> : <a href="https://blog.csdn.net/kevin66654/article/details/86773517" target="_blank" rel="noopener">文章</a></p>
+<p><code>wget</code></p>
+<p>( <code>python</code> | <code>python3</code> ) &amp; ( <code>python-pip</code> | <code>python3-pip</code> )</p>
+<p><code>pwntools</code></p>
+<p><code>gcc-multilib</code></p>
+<p>[…]</p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-前言"><span class="toc-number">1.</span> <span class="toc-text">0x01 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-准备镜像"><span class="toc-number">2.</span> <span class="toc-text">0x02 准备镜像</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-制作容器"><span class="toc-number">3.</span> <span class="toc-text">0x03 制作容器</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-换源"><span class="toc-number">4.</span> <span class="toc-text">0x04 换源</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-各种工具"><span class="toc-number">5.</span> <span class="toc-text">0x05 各种工具</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/17/pwndocker/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/17/pwndocker/&text=pwndocker" target="_blank" rel="noopener"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/17/pwndocker/&is_video=false&description=pwndocker" target="_blank" rel="noopener"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=pwndocker&body=Check out this article: http://yoursite.com/2019/12/17/pwndocker/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/17/pwndocker/&title=pwndocker" target="_blank" rel="noopener"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/17/pwndocker/&name=pwndocker&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/17/pwndocker/&t=pwndocker" target="_blank" rel="noopener"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy; 2020 zndetcl
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+<link rel="stylesheet" href="/lib/justified-gallery/css/justifiedGallery.min.css">
+
+    <!-- jquery -->
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/lib/justified-gallery/js/jquery.justifiedGallery.min.js"></script>
+<!-- clipboard -->
+
+  <script src="/lib/clipboard/clipboard.min.js"></script>
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight .code pre").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      target: function(trigger) {
+        return trigger.nextElementSibling;
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+<script src="/js/main.js"></script>
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>

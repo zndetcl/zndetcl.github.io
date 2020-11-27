@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="0x00 前言在 linux pwn 的学习中，了解到了 shellcode 这么一块知识，更学习到了需要 syscall 指令才能触发系统调用 下面就是一小段 shellcode main:     xor eax, eax     mov rbx, 0xFF978CD091969DD1     neg rbx     push rbx     ;mov rdi, rsp     push rs">
+<meta name="keywords" content="learn">
+<meta property="og:type" content="article">
+<meta property="og:title" content="初识vdso&amp;vsyscall">
+<meta property="og:url" content="http:&#x2F;&#x2F;yoursite.com&#x2F;2019&#x2F;12&#x2F;21&#x2F;%E5%88%9D%E8%AF%86vdso-vsyscall&#x2F;index.html">
+<meta property="og:site_name" content="zndetcl blog">
+<meta property="og:description" content="0x00 前言在 linux pwn 的学习中，了解到了 shellcode 这么一块知识，更学习到了需要 syscall 指令才能触发系统调用 下面就是一小段 shellcode main:     xor eax, eax     mov rbx, 0xFF978CD091969DD1     neg rbx     push rbx     ;mov rdi, rsp     push rs">
+<meta property="og:locale" content="en">
+<meta property="og:updated_time" content="2019-12-21T13:40:54.859Z">
+<meta name="twitter:card" content="summary">
+    
+    
+        
+          
+              <link rel="shortcut icon" href="/images/favicon.ico">
+          
+        
+        
+          
+            <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+          
+        
+        
+          
+            <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+          
+        
+    
+    <!-- title -->
+    <title>初识vdso&amp;vsyscall</title>
+    <!-- styles -->
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- persian styles -->
+    
+      <link rel="stylesheet" href="/css/rtl.css">
+    
+    <!-- rss -->
+    
+    
+</head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" href="/2019/12/23/core-dump/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" href="/2019/12/17/pwndocker/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/" target="_blank" rel="noopener"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&text=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&is_video=false&description=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=初识vdso&amp;vsyscall&body=Check out this article: http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&name=初识vdso&amp;vsyscall&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&t=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x00-前言"><span class="toc-number">1.</span> <span class="toc-text">0x00 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-vsyscall"><span class="toc-number">2.</span> <span class="toc-text">0x01 vsyscall</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-vDSO"><span class="toc-number">3.</span> <span class="toc-text">0x02 vDSO</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-总结"><span class="toc-number">4.</span> <span class="toc-text">0x04 总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-Referer"><span class="toc-number">5.</span> <span class="toc-text">0x05 Referer</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        初识vdso&amp;vsyscall
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">zndetcl blog</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2019-12-21T12:42:03.000Z" itemprop="datePublished">2019-12-21</time>
+        
+      
+    </div>
+
+
+      
+    <div class="article-category">
+        <i class="fas fa-archive"></i>
+        <a class="category-link" href="/categories/binary/">binary</a>
+    </div>
+
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h2 id="0x00-前言"><a href="#0x00-前言" class="headerlink" title="0x00 前言"></a>0x00 前言</h2><p>在 linux pwn 的学习中，了解到了 shellcode 这么一块知识，更学习到了需要 <code>syscall</code> 指令才能触发系统调用</p>
+<p>下面就是一小段 shellcode</p>
+<pre><code class="assembly">main:
+    xor eax, eax
+    mov rbx, 0xFF978CD091969DD1
+    neg rbx
+    push rbx
+    ;mov rdi, rsp
+    push rsp
+    pop rdi
+    cdq
+    push rdx
+    push rdi
+    ;mov rsi, rsp
+    push rsp
+    pop rsi
+    mov al, 0x3b
+    syscall
+
+// char code[] = &quot;\x31\xc0\x48\xbb\xd1\x9d\x96\x91\xd0\x8c\x97\xff\x48\xf7\xdb\x53\x54\x5f\x99\x52\x57\x54\x5e\xb0\x3b\x0f\x05&quot;;</code></pre>
+<p>可见，最后的 <code>\x0f\x05</code> 就是 <code>syscall</code> 系统调用</p>
+<h2 id="0x01-vsyscall"><a href="#0x01-vsyscall" class="headerlink" title="0x01 vsyscall"></a>0x01 vsyscall</h2><p><code>syscall</code> 简而言之就是从用户态转去内核态执行一些高权限操作，但是呢似乎这个开销比较大，得搞中断然后保存各种信息最后跑去申请在内核态运行，最终还得回到用户态继续执行代码</p>
+<p>那么平时一些不需要太多复杂操作的系统调用就被提炼出来以减少系统开销加快运行速度，通过 <code>vsyscall</code> 这个入口去访问，如 <code>gettimeofday()</code> 这样的只是读个数据出来的操作，就可以将其映射到用户空间供其调用，每次也不用切换内核/用户空间了</p>
+<p><strong>不过 <code>vsyscall</code> 采用固定地址映射的方式实现</strong></p>
+<h2 id="0x02-vDSO"><a href="#0x02-vDSO" class="headerlink" title="0x02 vDSO"></a>0x02 vDSO</h2><p>可以将vdso看成一个shared objdect file（这个文件实际上不存在），内核将其映射到某个地址空间，被所有程序所共享。它可以理解为 <code>vsyscall</code> + ASLR </p>
+<h2 id="0x04-总结"><a href="#0x04-总结" class="headerlink" title="0x04 总结"></a>0x04 总结</h2><p>太菜了这些个内容只看能了解了解，自己的理解就是把 <code>syscall</code> 中的部分系统调用单独提炼出来，以此加快运行速度，而后使用 ASLR 加强安全性，更近一步的具体实现以及各种特性就力不从心了-看不懂emmm</p>
+<h2 id="0x05-Referer"><a href="#0x05-Referer" class="headerlink" title="0x05 Referer"></a>0x05 Referer</h2><p><a href="https://blog.csdn.net/u012927281/article/details/51649477" target="_blank" rel="noopener">linux vdso与vsyscall相关内容总结</a></p>
+<p><a href="http://www.cppblog.com/hex108/archive/2010/11/22/134313.html" target="_blank" rel="noopener">linux下的vdso与vsyscall</a></p>
+<p>大佬博客：<a href="https://vvl.me/2019/06/linux-syscall-and-vsyscall-vdso-in-x86/" target="_blank" rel="noopener">x86 架构下 Linux 的系统调用与 vsyscall, vDSO</a></p>
+<p><a href="https://xinqiu.gitbooks.io/linux-insides-cn/content/SysCall/linux-syscall-3.html" target="_blank" rel="noopener">https://xinqiu.gitbooks.io/linux-insides-cn/content/SysCall/linux-syscall-3.html</a></p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x00-前言"><span class="toc-number">1.</span> <span class="toc-text">0x00 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-vsyscall"><span class="toc-number">2.</span> <span class="toc-text">0x01 vsyscall</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-vDSO"><span class="toc-number">3.</span> <span class="toc-text">0x02 vDSO</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-总结"><span class="toc-number">4.</span> <span class="toc-text">0x04 总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x05-Referer"><span class="toc-number">5.</span> <span class="toc-text">0x05 Referer</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&text=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&is_video=false&description=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=初识vdso&amp;vsyscall&body=Check out this article: http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&title=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&name=初识vdso&amp;vsyscall&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/21/%E5%88%9D%E8%AF%86vdso-vsyscall/&t=初识vdso&amp;vsyscall" target="_blank" rel="noopener"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy; 2020 zndetcl
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+<link rel="stylesheet" href="/lib/justified-gallery/css/justifiedGallery.min.css">
+
+    <!-- jquery -->
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/lib/justified-gallery/js/jquery.justifiedGallery.min.js"></script>
+<!-- clipboard -->
+
+  <script src="/lib/clipboard/clipboard.min.js"></script>
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight .code pre").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      target: function(trigger) {
+        return trigger.nextElementSibling;
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+<script src="/js/main.js"></script>
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>

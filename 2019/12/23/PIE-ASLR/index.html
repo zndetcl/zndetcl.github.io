@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="description" content="0x00 前言在手动调试一个 vsyscall 的利用时，发现不用博文中的办法就一直 segment fault，由于懒也没有去查看 core 博文：pwn 中 vsyscall 的利用（PIE） 自己琢磨觉得既然能够 jmp 到指定地址了，为啥我不直接跳 backdoor，然后尝试了在栈顶直接塞 backdoor ?(图样图森破) 然后怎么都不行，在 gdb 调试也是直接 crash (gdb">
+<meta name="keywords" content="learn">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PIE&amp;ASLR">
+<meta property="og:url" content="http:&#x2F;&#x2F;yoursite.com&#x2F;2019&#x2F;12&#x2F;23&#x2F;PIE-ASLR&#x2F;index.html">
+<meta property="og:site_name" content="zndetcl blog">
+<meta property="og:description" content="0x00 前言在手动调试一个 vsyscall 的利用时，发现不用博文中的办法就一直 segment fault，由于懒也没有去查看 core 博文：pwn 中 vsyscall 的利用（PIE） 自己琢磨觉得既然能够 jmp 到指定地址了，为啥我不直接跳 backdoor，然后尝试了在栈顶直接塞 backdoor ?(图样图森破) 然后怎么都不行，在 gdb 调试也是直接 crash (gdb">
+<meta property="og:locale" content="en">
+<meta property="og:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191223204526982.png">
+<meta property="og:updated_time" content="2019-12-23T15:04:52.006Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http:&#x2F;&#x2F;yoursite.com&#x2F;.com&#x2F;&#x2F;image-20191223204526982.png">
+    
+    
+        
+          
+              <link rel="shortcut icon" href="/images/favicon.ico">
+          
+        
+        
+          
+            <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+          
+        
+        
+          
+            <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+          
+        
+    
+    <!-- title -->
+    <title>PIE&amp;ASLR</title>
+    <!-- styles -->
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- persian styles -->
+    
+      <link rel="stylesheet" href="/css/rtl.css">
+    
+    <!-- rss -->
+    
+    
+</head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" href="/2019/12/25/PIE-BYPASS-1-partial-write/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" href="/2019/12/23/core-dump/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/23/PIE-ASLR/" target="_blank" rel="noopener"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/23/PIE-ASLR/&text=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/23/PIE-ASLR/&is_video=false&description=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=PIE&amp;ASLR&body=Check out this article: http://yoursite.com/2019/12/23/PIE-ASLR/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/23/PIE-ASLR/&name=PIE&amp;ASLR&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/23/PIE-ASLR/&t=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x00-前言"><span class="toc-number">1.</span> <span class="toc-text">0x00 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-认真了解-ASLR"><span class="toc-number">2.</span> <span class="toc-text">0x01 认真了解 ASLR</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-了解-PIE"><span class="toc-number">3.</span> <span class="toc-text">0x02 了解 PIE</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-回到出发点"><span class="toc-number">4.</span> <span class="toc-text">0x03 回到出发点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-Referer"><span class="toc-number">5.</span> <span class="toc-text">0x04 Referer</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        PIE&amp;ASLR
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">zndetcl blog</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2019-12-23T09:28:32.000Z" itemprop="datePublished">2019-12-23</time>
+        
+      
+    </div>
+
+
+      
+    <div class="article-category">
+        <i class="fas fa-archive"></i>
+        <a class="category-link" href="/categories/linux/">linux</a> › <a class="category-link" href="/categories/linux/binary/">binary</a>
+    </div>
+
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h2 id="0x00-前言"><a href="#0x00-前言" class="headerlink" title="0x00 前言"></a>0x00 前言</h2><p>在手动调试一个 vsyscall 的利用时，发现不用博文中的办法就一直 segment fault，由于懒也没有去查看 core</p>
+<p>博文：<a href="http://blog.eonew.cn/archives/968" target="_blank" rel="noopener">pwn 中 vsyscall 的利用（PIE）</a></p>
+<p>自己琢磨觉得既然能够 jmp 到指定地址了，为啥我不直接跳 backdoor，然后尝试了在栈顶直接塞 backdoor ?(图样图森破)</p>
+<p>然后怎么都不行，在 gdb 调试也是直接 crash (gdb 调试默认 ASLR 关闭，害人不浅)</p>
+<p>突然想起来大哥说的，开启 PIE 后，低地址不变高地址随机变化的，心思是不是地址的问题，可是每次打开 gdb 用 <code>vmmap</code> 看地址映射一直都没变啊233333</p>
+<h2 id="0x01-认真了解-ASLR"><a href="#0x01-认真了解-ASLR" class="headerlink" title="0x01 认真了解 ASLR"></a>0x01 认真了解 ASLR</h2><p>简介如下</p>
+<blockquote>
+<p>ASLR(Address Space Layout Randomization)在2005年被引入到Linux的内核 kernel 2.6.12 中，当然早在2004年就以patch的形式被引入。随着内存地址的随机化，使得响应的应用变得随机。这意味着同一应用多次执行所使用内存空间完全不同，也意味着简单的缓冲区溢出攻击无法达到目的。</p>
+<p>GDB从版本7开始，第一次在Ubuntu 9.10（Karmic）上，被调试的程序可以被关闭ASLR（通过标记位ADDR_NO_RANDOMIZE ）<br>————————————————</p>
+<p>原文链接：<a href="https://blog.csdn.net/counsellor/article/details/81543197" target="_blank" rel="noopener">https://blog.csdn.net/counsellor/article/details/81543197</a></p>
+</blockquote>
+<p>查看当前系统中的 ASLR 配置情况</p>
+<pre><code class="bash">$ cat /proc/sys/kernel/randomize_va_space 
+2
+$ sysctl -a --pattern randomize
+kernel.randomize_va_space = 2</code></pre>
+<p>如上，两种命令都可以查看 ASLR 的配置，那么其值意义如下</p>
+<pre><code class="text">0 = 关闭
+1 = 半随机。共享库、栈、mmap() 以及 VDSO 将被随机化。（留坑，PIE会影响heap的随机化。。）
+2 = 全随机。除了1中所述，还有heap</code></pre>
+<p>在 gdb 中查看它的 ASLR 配置</p>
+<pre><code class="bash">$ (gdb) show disable-randomization 
+Disabling randomization of debuggee&#39;s virtual address space is on.</code></pre>
+<p>如上，默认值是 on ，意思就是已经关闭了 ASLR ，如果要开启请使用 <code>set</code> 命令</p>
+<pre><code class="bash">$ (gdb) set disable-randomization off
+$ (gdb) show disable-randomization 
+Disabling randomization of debuggee&#39;s virtual address space is off.</code></pre>
+<p>如上，已经开启了 gdb 中的 ASLR，如果想要长期生效，就写 <code>set disable-randomization off</code> 到  <code>~/.gdbinit</code> 中</p>
+<p>了解了如何配置 ASLR 之后，我们来详细看看配置效果</p>
+<p>0 为关闭，不用谈了，每次程序运行加载 libs, stack, heap 等都是同一基址</p>
+<ul>
+<li>1 -&gt; mmap 基址, stack, vDSO, libs 都会页面随机化</li>
+<li>2 -&gt; 在 1 的基础上，增加 heap 的页面随机化</li>
+</ul>
+<p>由于 1 和 2 级别差距不大，就是一个 heap 的页面地址随机化，所以我们直接看看级别为 2 的 ASLR 效果</p>
+<p>可以直接 <code>cat /proc/pid/maps</code> 来查看</p>
+<pre><code class="bash">$ cat /proc/417/maps -vv
+563604466000-563604467000 r-xp 00000000 00:26 41204652                   /pwn/vsyscall_test/vsyscall
+563604666000-563604667000 r--p 00000000 00:26 41204652                   /pwn/vsyscall_test/vsyscall
+563604667000-563604668000 rw-p 00001000 00:26 41204652                   /pwn/vsyscall_test/vsyscall
+7f62dc536000-7f62dc71d000 r-xp 00000000 00:2e 34                         /lib/x86_64-linux-gnu/libc-2.27.so
+7f62dc71d000-7f62dc91d000 ---p 001e7000 00:2e 34                         /lib/x86_64-linux-gnu/libc-2.27.so
+7f62dc91d000-7f62dc921000 r--p 001e7000 00:2e 34                         /lib/x86_64-linux-gnu/libc-2.27.so
+7f62dc921000-7f62dc923000 rw-p 001eb000 00:2e 34                         /lib/x86_64-linux-gnu/libc-2.27.so
+7f62dc923000-7f62dc927000 rw-p 00000000 00:00 0 
+7f62dc927000-7f62dc94e000 r-xp 00000000 00:2e 27                         /lib/x86_64-linux-gnu/ld-2.27.so
+7f62dcb45000-7f62dcb47000 rw-p 00000000 00:00 0 
+7f62dcb4e000-7f62dcb4f000 r--p 00027000 00:2e 27                         /lib/x86_64-linux-gnu/ld-2.27.so
+7f62dcb4f000-7f62dcb50000 rw-p 00028000 00:2e 27                         /lib/x86_64-linux-gnu/ld-2.27.so
+7f62dcb50000-7f62dcb51000 rw-p 00000000 00:00 0 
+7fff5dab1000-7fff5dad2000 rw-p 00000000 00:00 0                          [stack]
+7fff5db6e000-7fff5db70000 r--p 00000000 00:00 0                          [vvar]
+7fff5db70000-7fff5db72000 r-xp 00000000 00:00 0                          [vdso]
+ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]</code></pre>
+<p>更简单点是使用 gdb 的 <code>vmmap</code>  (这里不太清楚是否是 gdb-gef 实现的)</p>
+<pre><code class="bash">(gdb) vmmap 
+Start              End                Offset             Perm Path
+0x0000558e9d31e000 0x0000558e9d31f000 0x0000000000000000 r-x /pwn/vsyscall_test/vsyscall
+0x0000558e9d51e000 0x0000558e9d51f000 0x0000000000000000 r-- /pwn/vsyscall_test/vsyscall
+0x0000558e9d51f000 0x0000558e9d520000 0x0000000000001000 rw- /pwn/vsyscall_test/vsyscall
+0x00007fa9c1818000 0x00007fa9c19ff000 0x0000000000000000 r-x /lib/x86_64-linux-gnu/libc-2.27.so
+0x00007fa9c19ff000 0x00007fa9c1bff000 0x00000000001e7000 --- /lib/x86_64-linux-gnu/libc-2.27.so
+0x00007fa9c1bff000 0x00007fa9c1c03000 0x00000000001e7000 r-- /lib/x86_64-linux-gnu/libc-2.27.so
+0x00007fa9c1c03000 0x00007fa9c1c05000 0x00000000001eb000 rw- /lib/x86_64-linux-gnu/libc-2.27.so
+0x00007fa9c1c05000 0x00007fa9c1c09000 0x0000000000000000 rw- 
+0x00007fa9c1c09000 0x00007fa9c1c30000 0x0000000000000000 r-x /lib/x86_64-linux-gnu/ld-2.27.so
+0x00007fa9c1e27000 0x00007fa9c1e29000 0x0000000000000000 rw- 
+0x00007fa9c1e30000 0x00007fa9c1e31000 0x0000000000027000 r-- /lib/x86_64-linux-gnu/ld-2.27.so
+0x00007fa9c1e31000 0x00007fa9c1e32000 0x0000000000028000 rw- /lib/x86_64-linux-gnu/ld-2.27.so
+0x00007fa9c1e32000 0x00007fa9c1e33000 0x0000000000000000 rw- 
+0x00007ffc4af3c000 0x00007ffc4af5d000 0x0000000000000000 rw- [stack]
+0x00007ffc4af6b000 0x00007ffc4af6d000 0x0000000000000000 r-- [vvar]
+0x00007ffc4af6d000 0x00007ffc4af6f000 0x0000000000000000 r-x [vdso]
+0xffffffffff600000 0xffffffffff601000 0x0000000000000000 r-x [vsyscall]
+(gdb) r
+[...] // 再运行一边，这个时候因为 ASLR ，地址全变了
+(gdb) vmmap 
+Start              End                Offset             Perm Path
+0x0000563604466000 0x0000563604467000 0x0000000000000000 r-x /pwn/vsyscall_test/vsyscall
+0x0000563604666000 0x0000563604667000 0x0000000000000000 r-- /pwn/vsyscall_test/vsyscall
+0x0000563604667000 0x0000563604668000 0x0000000000001000 rw- /pwn/vsyscall_test/vsyscall
+0x00007f62dc536000 0x00007f62dc71d000 0x0000000000000000 r-x /lib/x86_64-linux-gnu/libc-2.27.so
+0x00007f62dc71d000 0x00007f62dc91d000 0x00000000001e7000 --- /lib/x86_64-linux-gnu/libc-2.27.so
+0x00007f62dc91d000 0x00007f62dc921000 0x00000000001e7000 r-- /lib/x86_64-linux-gnu/libc-2.27.so
+0x00007f62dc921000 0x00007f62dc923000 0x00000000001eb000 rw- /lib/x86_64-linux-gnu/libc-2.27.so
+0x00007f62dc923000 0x00007f62dc927000 0x0000000000000000 rw- 
+0x00007f62dc927000 0x00007f62dc94e000 0x0000000000000000 r-x /lib/x86_64-linux-gnu/ld-2.27.so
+0x00007f62dcb45000 0x00007f62dcb47000 0x0000000000000000 rw- 
+0x00007f62dcb4e000 0x00007f62dcb4f000 0x0000000000027000 r-- /lib/x86_64-linux-gnu/ld-2.27.so
+0x00007f62dcb4f000 0x00007f62dcb50000 0x0000000000028000 rw- /lib/x86_64-linux-gnu/ld-2.27.so
+0x00007f62dcb50000 0x00007f62dcb51000 0x0000000000000000 rw- 
+0x00007fff5dab1000 0x00007fff5dad2000 0x0000000000000000 rw- [stack]
+0x00007fff5db6e000 0x00007fff5db70000 0x0000000000000000 r-- [vvar]
+0x00007fff5db70000 0x00007fff5db72000 0x0000000000000000 r-x [vdso]
+0xffffffffff600000 0xffffffffff601000 0x0000000000000000 r-x [vsyscall]</code></pre>
+<p>如上，注意观察 path 的 start 地址，除了 <code>vsyscall</code> 地址之外，两次 <code>vmmap</code> 命令的结果都不一样，注意这里的程序是<strong>开启了 PIE</strong> 的，如下 (<strong>所以所有的地址全都变了</strong>)</p>
+<pre><code class="bash">(gdb) checksec 
+[+] checksec for &#39;/pwn/vsyscall_test/vsyscall&#39;
+Canary                        : Yes
+NX                            : Yes
+PIE                           : Yes
+Fortify                       : No
+RelRO                         : Full</code></pre>
+<p><strong>ASLR 不负责代码段以及数据段的随机化工作，这项工作由 PIE 负责。但是只有在开启 ASLR 之后，PIE 才会生效</strong></p>
+<h2 id="0x02-了解-PIE"><a href="#0x02-了解-PIE" class="headerlink" title="0x02 了解 PIE"></a>0x02 了解 PIE</h2><p>有了前文的基础，同时有了众多安全研究者的努力，我们发现 ASLR 只能改变 mmap 基址, stack, heap, vDSO, libs 的地址，但是 elf 文件可不只是有 mmap, stack, heap, vDSO, libs ，还存在代码段、数据段呢，如下（还有一些 elf 运行时内存布局现在没有学习）</p>
+<p><img src="/.com//image-20191223204526982.png" alt="image-20191223204526982"></p>
+<p>由此，众多大佬搞出了各种 bypass ASLR 的姿势，如 <strong>return-to-plt、got hijack、stack-pivot(bypass stack ransomize)</strong> 等</p>
+<p>这个时候，PIE 出来救火了，全地址页面随机 (<code>vsyscall</code> 是个特例，是为了兼容低版本而存在)</p>
+<p>PIE 的效果就和上文在 gdb 中调用 <code>vmmap</code> 的结果一样，除了 <code>vsyscall</code> 之外，所有地址动态变化</p>
+<blockquote>
+<p>PIE(position-independent executable, 地址无关可执行文件)技术就是一个针对代码段.text, 数据段.*data，.bss等固定地址的一个防护技术。同ASLR一样，应用了PIE的程序会在每次加载时都变换加载基址，从而使位于程序本身的gadget也失效</p>
+</blockquote>
+<h2 id="0x03-回到出发点"><a href="#0x03-回到出发点" class="headerlink" title="0x03 回到出发点"></a>0x03 回到出发点</h2><p>因为 <a href="http://blog.eonew.cn/archives/968" target="_blank" rel="noopener">pwn 中 vsyscall 的利用（PIE）</a> 延伸出的疑问已经解决了，回顾上文</p>
+<blockquote>
+<p>自己琢磨觉得既然能够 jmp 到指定地址了，为啥我不直接跳 backdoor，然后尝试了在栈顶直接塞 backdoor ?</p>
+</blockquote>
+<p>如果直接跳 backdoor ，必定要指定其地址，那么由于 ASLR + PIE ，代码段随机页面地址，那肯定凉凉</p>
+<p>博文中，使用 <code>\x4e</code> 去覆盖那个单子节，就是为了 bypass PIE，因为同一代码段中高地址变化，低地址不变，覆盖低地址的动作 = 指向 backdoor 地址，想起了大哥说的话，一页 = 4096 = 0x1000 ，PIE 开启时，低 3 位不会变，随机页意味着从第 4 位开始变，这一点也可以从上文中 <code>vmmap</code> 能够看出，如</p>
+<pre><code class="text">Start              End                Offset             Perm Path
+0x0000558e9d31e000 0x0000558e9d31f000 0x0000000000000000 r-x /pwn/vsyscall_test/vsyscall
+Start              End                Offset             Perm Path
+0x0000563604466000 0x0000563604467000 0x0000000000000000 r-x /pwn/vsyscall_test/vsyscall</code></pre>
+<p>如上，<code>0x0000558e9d31e</code> 变到 <code>0x0000563604466</code> ，而他们的低地址，都是不会变化的（目前知识体系太窄，见识少，希望以后能够打脸，始终感觉可能低地址也会改变）</p>
+<h2 id="0x04-Referer"><a href="#0x04-Referer" class="headerlink" title="0x04 Referer"></a>0x04 Referer</h2><p><a href="https://blog.csdn.net/spenghui/article/details/79910884" target="_blank" rel="noopener">ASLR和PIE的区别</a></p>
+<p><a href="http://www.bubuko.com/infodetail-2345056.html" target="_blank" rel="noopener">关于Linux下ASLR与PIE的一些理解</a></p>
+<p><a href="http://blog.sina.com.cn/s/blog_4ed962ae01013vhr.html" target="_blank" rel="noopener">elf文件格式和运行时内存布局</a></p>
+<p><a href="https://www.cnblogs.com/ichunqiu/p/11350476.html" target="_blank" rel="noopener">PIE与bypass思路</a></p>
+<p><a href="https://www.cnblogs.com/rec0rd/p/7646857.html" target="_blank" rel="noopener">https://www.cnblogs.com/rec0rd/p/7646857.html</a></p>
+<p><a href="https://blog.csdn.net/counsellor/article/details/81543197" target="_blank" rel="noopener">Linux下关闭ALSR(地址空间随机化)的方法</a></p>
+<p>大佬博客：<a href="https://blog.csdn.net/counsellor/category_5805051.html" target="_blank" rel="noopener">https://blog.csdn.net/counsellor/category_5805051.html</a></p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#0x00-前言"><span class="toc-number">1.</span> <span class="toc-text">0x00 前言</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x01-认真了解-ASLR"><span class="toc-number">2.</span> <span class="toc-text">0x01 认真了解 ASLR</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x02-了解-PIE"><span class="toc-number">3.</span> <span class="toc-text">0x02 了解 PIE</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x03-回到出发点"><span class="toc-number">4.</span> <span class="toc-text">0x03 回到出发点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#0x04-Referer"><span class="toc-number">5.</span> <span class="toc-text">0x04 Referer</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" href="http://www.facebook.com/sharer.php?u=http://yoursite.com/2019/12/23/PIE-ASLR/" target="_blank" rel="noopener"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://twitter.com/share?url=http://yoursite.com/2019/12/23/PIE-ASLR/&text=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.linkedin.com/shareArticle?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=http://yoursite.com/2019/12/23/PIE-ASLR/&is_video=false&description=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=PIE&amp;ASLR&body=Check out this article: http://yoursite.com/2019/12/23/PIE-ASLR/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://getpocket.com/save?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://reddit.com/submit?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.stumbleupon.com/submit?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://digg.com/submit?url=http://yoursite.com/2019/12/23/PIE-ASLR/&title=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="http://www.tumblr.com/share/link?url=http://yoursite.com/2019/12/23/PIE-ASLR/&name=PIE&amp;ASLR&description=" target="_blank" rel="noopener"><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="https://news.ycombinator.com/submitlink?u=http://yoursite.com/2019/12/23/PIE-ASLR/&t=PIE&amp;ASLR" target="_blank" rel="noopener"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy; 2020 zndetcl
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/tags/">tags</a></li>
+         
+          <li><a href="/categories/">categories</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+<link rel="stylesheet" href="/lib/justified-gallery/css/justifiedGallery.min.css">
+
+    <!-- jquery -->
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/lib/justified-gallery/js/jquery.justifiedGallery.min.js"></script>
+<!-- clipboard -->
+
+  <script src="/lib/clipboard/clipboard.min.js"></script>
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight .code pre").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      target: function(trigger) {
+        return trigger.nextElementSibling;
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+<script src="/js/main.js"></script>
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>
